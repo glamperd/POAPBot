@@ -16,7 +16,7 @@ client.on('message', message => {
     else {
         console.log(`Message ${message.content} from ${message.author.username}`);
         message.react(':eyes:');
-        
+        message.react(':discor:');
     }
 });
 
