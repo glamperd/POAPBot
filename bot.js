@@ -14,7 +14,7 @@ client.on('message', message => {
        message.reply('pong');
        }
     else {
-        console.log(message);
+        console.log(`Message ${message.content} from ${message.author.username}`);
     }
 });
 
