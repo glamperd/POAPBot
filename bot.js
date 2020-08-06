@@ -9,7 +9,7 @@ client.on('ready', () => {
 
  
 
-client.on('message', message => {
+client.on('message', async message => {
     if (message.content === 'ping') {
        message.reply('pong');
        }
@@ -17,6 +17,9 @@ client.on('message', message => {
         console.log(`Message ${message.content} from ${message.author.username}`);
         message.react('👍');
         //message.react(':discor:');
+        const user = message.author;
+        const dm = await user.createDM();
+        dm.send('sending u a PM :smile:');
     }
 });
 
