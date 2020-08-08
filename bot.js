@@ -1,10 +1,27 @@
 const Discord = require('discord.js');
+const { Client } = require('pg')
+
 
 const client = new Discord.Client();
+const pgClient = new Client({
+    user: process.env.PGUSER,
+    host: process.env.DATABASE_URL,
+    database: 'poapdb',
+    password: process.env.PGPASSWORD,
+    port: process.env.PGPORT,
+});
 
 
 client.on('ready', () => {
     console.log('I am ready!');
+
+    (async () => {
+        await pgClient.connect()
+        const res = await pgClient.query('SELECT $1::text as message', ['Hello world!'])
+        console.log(res.rows[0].message) // Hello world!
+        await pgClient.end()
+      })()
+      
 });
 
  
@@ -14,7 +31,7 @@ client.on('message', async message => {
        message.reply('pong');
        }
     else {
-        console.log(`Message ${message.content} from ${message.author.username}`);
+        console.log(`Message ${message.content} from ${message.author.username} in ${message.channel.type}`);
         message.react('👍');
         //message.react(':discor:');
         const user = message.author;
