@@ -6,7 +6,7 @@ const client = new Discord.Client();
 const pgClient = new Client({
     //user: process.env.PGUSER,
     host: process.env.DATABASE_URL,
-    database: 'poapdb',
+    //database: 'poapdb',
     //password: process.env.PGPASSWORD,
     //port: process.env.PGPORT,
 });
