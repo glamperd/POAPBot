@@ -4,11 +4,11 @@ const { Client } = require('pg')
 
 const client = new Discord.Client();
 const pgClient = new Client({
-    //user: process.env.PGUSER,
-    host: process.env.DATABASE_URL,
-    //database: 'poapdb',
-    //password: process.env.PGPASSWORD,
-    //port: process.env.PGPORT,
+    user: process.env.DB_USER,
+    host: 'localhost',
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
 });
 
 
