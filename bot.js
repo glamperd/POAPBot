@@ -4,11 +4,11 @@ const { Client } = require('pg')
 
 const client = new Discord.Client();
 const pgClient = new Client({
-    user: process.env.PGUSER,
+    //user: process.env.PGUSER,
     host: process.env.DATABASE_URL,
     database: 'poapdb',
-    password: process.env.PGPASSWORD,
-    port: process.env.PGPORT,
+    //password: process.env.PGPASSWORD,
+    //port: process.env.PGPORT,
 });
 
 
@@ -30,13 +30,18 @@ client.on('message', async message => {
     if (message.content === 'ping') {
        message.reply('pong');
        }
-    else {
-        console.log(`Message ${message.content} from ${message.author.username} in ${message.channel.type}`);
-        message.react('👍');
-        //message.react(':discor:');
-        const user = message.author;
-        const dm = await user.createDM();
-        dm.send('sending u a PM :smile:');
+    else if (!message.author.bot) {
+        if (message.channel.type === 'dm') {
+            console.log(`DM Message ${message.content} from ${message.author.username} in ${message.channel.type}`);
+
+        } else {
+            console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
+            message.react('👍');
+            //message.react(':discor:');
+            const user = message.author;
+            const dm = await user.createDM();
+            dm.send('sending u a PM :smile:');
+        }
     }
 });
 
