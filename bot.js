@@ -5,7 +5,7 @@ const { Client } = require('pg')
 const client = new Discord.Client();
 const pgClient = new Client({
     user: process.env.DB_USER,
-    host: 'localhost',
+    host: process.env.DB_HOST,
     database: process.env.DB_DATABASE,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
