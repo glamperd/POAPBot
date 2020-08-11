@@ -44,7 +44,7 @@ client.on('message', async message => {
                 console.log(`Message mentions me`);
                 if (message.contains('!setup' &&
                     // Check that user is an admin in this guild
-                    message.member.permissions.has(Permissions.FLAGS.MANAGE_GUILD))) {
+                    message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD))) {
                         console.log(`user has permission`)
                 } else {
                         console.log(`user lacks permission`)
