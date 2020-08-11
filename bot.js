@@ -1,6 +1,12 @@
 const Discord = require('discord.js');
 const { Client } = require('pg')
 
+const states = {
+    LISTEN: 'listen',
+    SETUP: 'setup',
+    EVENT: 'event',
+};
+let state = states.LISTEN;
 
 const client = new Discord.Client();
 
@@ -43,14 +49,21 @@ client.on('message', async message => {
             if (message.mentions.has(bot)) {
                 console.log(`Message mentions me`);
                 if (message.content.includes('!setup') &&
+                    state !== states.SETUP && // one at a time
                     // Check that user is an admin in this guild
                     message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {
                         console.log(`user has permission`)
                         // Get any current record for this guild
+
                         // set state to SETUP
+                        state = state.SETUP;
                         // start dialog in PM
+                        const user = message.author;
+                        const dm = await user.createDM();
+                        dm.send(`Hi ${user.username}! You want to set me up for an event in ${message.guild.name}? I'll ask for the details, one at a time.`);
+
                 } else {
-                        console.log(`user lacks permission`)
+                        console.log(`user lacks permission, or invalid command`);
                         message.react('❗');
                 }
             } else {
