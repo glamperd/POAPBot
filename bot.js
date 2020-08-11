@@ -112,7 +112,7 @@ const setupState = async (user) => {
     resetExpiry();
 }
 
-const handleStepAnswer = (answer) => {
+const handleStepAnswer = async (answer) => {
     switch (state.step) {
         case step.CHANNEL: {
             state.event.channel = answer; // TODO - confirm that guild has this channel
@@ -181,7 +181,7 @@ const resetExpiry = () => {
     }
 }
 
-const getEvent = (guild) => {
+const getEvent = async (guild) => {
     await pgClient.connect()
     const res = await pgClient.query('SELECT * FROM event WHERE server = $1', [guild]);
     console.log(`Event retrieved from DB: ${JSON.stringify(res.rows[0])}`);
@@ -195,7 +195,7 @@ const getEvent = (guild) => {
     }
 }
 
-const saveEvent = (event) => {
+const saveEvent = async (event) => {
     await pgClient.connect();
     let res;
     if (state.event.uuid) {
