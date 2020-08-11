@@ -64,10 +64,9 @@ client.on('message', async message => {
 
             if (message.mentions.has(bot)) {
                 console.log(`Message mentions me`);
-                if (message.content.includes('!setup') &&
-                    state !== states.SETUP && // one at a time
-                    // Check that user is an admin in this guild
-                    message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {
+                if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {// Check that user is an admin in this guild                     
+                    if (message.content.includes('!setup') &&
+                        state.state !== states.SETUP) {// one at a time
                         console.log(`user has permission`)
                         // Get any current record for this guild
                         state.event = getEvent(message.guild.name);
@@ -75,10 +74,7 @@ client.on('message', async message => {
                         state = state.SETUP;
                         // start dialog in PM
                         await setupState(message.author);
-                }
-                else if (message.content.includes('!list') &&
-                    // Check that user is an admin in this guild
-                    message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {
+                    } else if (message.content.includes('!list')) {
                         console.log(`list event `);
                         const event = getEvent(message.guild.name);
                         if (event) {
@@ -87,6 +83,9 @@ client.on('message', async message => {
                             console.log(`No current event`);
                             sendDM(message.author, `No event is currently set up for ${message.guild.name}`);
                         }
+                    } else {
+                        sendDM(message.author, `COmmands are: !setup, !list`);
+                    }
                 } else {
                     console.log(`user lacks permission, or invalid command`);
                     message.react('❗');
