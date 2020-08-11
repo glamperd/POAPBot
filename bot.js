@@ -18,7 +18,7 @@ const steps = {
 };
 var state = {
     state: states.LISTEN,
-    expiry: now,
+    expiry: new Date(),
     user: undefined,
     next: steps.NONE,
     event: {},
@@ -160,7 +160,7 @@ const handleStepAnswer = async (answer) => {
             state.event.reaction = answer;
             state.step = step.NONE;
             state.dm.send(`OK thanks. That's all done.`);
-            resetExpiry();
+            clearTimeout(state.expiry);
             saveEvent(state.event);
             break;
         }
