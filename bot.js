@@ -6,7 +6,7 @@ const states = {
     SETUP: 'setup',
     EVENT: 'event',
 };
-let state = states.LISTEN;
+var state = states.LISTEN;
 
 const client = new Discord.Client();
 
