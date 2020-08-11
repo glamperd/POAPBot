@@ -4,6 +4,7 @@ const { Client } = require('pg')
 
 const client = new Discord.Client();
 const bot = client.user;
+console.log(`bot user ID ${bot.id} ${bot.username}`)
 
 const pgClient = new Client({
     user: process.env.DB_USER,
