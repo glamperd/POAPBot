@@ -3,6 +3,8 @@ const { Client } = require('pg')
 
 
 const client = new Discord.Client();
+const bot = client.user;
+
 const pgClient = new Client({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
@@ -36,11 +38,15 @@ client.on('message', async message => {
 
         } else {
             console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
-            message.react('👍');
-            //message.react(':discor:');
-            const user = message.author;
-            const dm = await user.createDM();
-            dm.send('sending u a PM :smile:');
+            if (message.mentions.has(bot)) {
+                console.log(`Message mentions me`);
+            } else {
+                message.react('👍');
+                //message.react(':discor:');
+                const user = message.author;
+                const dm = await user.createDM();
+                dm.send('sending u a PM :smile:');
+            }
         }
     }
 });
