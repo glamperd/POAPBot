@@ -181,10 +181,11 @@ const resetExpiry = () => {
 }
 
 const getEvent = async (guild) => {
-    await pgClient.connect()
+    if (pgClient.)await pgClient.connect()
     const res = await pgClient.query('SELECT * FROM event WHERE server = $1', [guild]);
     console.log(`Event retrieved from DB: ${JSON.stringify(res.rows[0])}`);
     await pgClient.end();
+    //await pgClient.end();
     if (res.rows.count > 0) {
         return {
             ...res.rows[0],
