@@ -3,8 +3,6 @@ const { Client } = require('pg')
 
 
 const client = new Discord.Client();
-const bot = client.user;
-console.log(`bot user ID ${bot.id} ${bot.username}`)
 
 const pgClient = new Client({
     user: process.env.DB_USER,
@@ -39,6 +37,9 @@ client.on('message', async message => {
 
         } else {
             console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
+            const bot = client.user;
+            console.log(`bot user ID ${bot.id} ${bot.username}`);
+
             if (message.mentions.has(bot)) {
                 console.log(`Message mentions me`);
             } else {
