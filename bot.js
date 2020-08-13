@@ -83,8 +83,16 @@ client.on('message', async message => {
                             console.log(`No current event`);
                             sendDM(message.author, `No event is currently set up for ${message.guild.name}`);
                         }
+                    } else if (message.content.includes('!status')) {
+                        console.log(`status request`);
+                        const event = getEvent(message.guild.name);
+                        if (event.uuid) {
+                            sendDM(message.author, JSON.stringify(event));
+                        } else {
+                            sendDM(message.author, `Current status: ${state.state}`);
+                        }
                     } else {
-                        message.reply(`Commands are: !setup, !list`);
+                        message.reply(`Commands are: !setup, !list, !status`);
                     }
                 } else {
                     console.log(`user lacks permission, or invalid command`);
@@ -182,10 +190,10 @@ const resetExpiry = () => {
 
 const getEvent = async (guild) => {
     try {
-        await pgClient.connect();
+        //await pgClient.connect();
         const res = await pgClient.query('SELECT * FROM event WHERE server = $1', [guild]);
         console.log(`Event retrieved from DB: ${JSON.stringify(res.rows[0])}`);
-        await pgClient.end();
+        //await pgClient.end();
     } catch (err) {
         console.log(`Error while getting event: ${err.message}`);
     }
@@ -200,26 +208,26 @@ const getEvent = async (guild) => {
 
 const saveEvent = async (event) => {
     try {
-    await pgClient.connect();
-    let res;
-    if (state.event.uuid) {
-        // UPDATE
-        res = await pgClient.query('UPDATE event ' + 
-            'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7 ' + 
-            'WHERE uuid=$8',
-         [event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction, event.uuid]);
-    } else {
-        // INSERT
-        res = await pgClient.query('INSERT INTO event ' + 
-            '(uuid, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
-            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-         [uuidv4(), event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
-    }
-    console.log(res.rows[0]) // 
-    await pgClient.end()
-    } catch (err) {
-        console.log(`Error saving event: ${err.message}`);
-    } 
+        //await pgClient.connect();
+        let res;
+        if (state.event.uuid) {
+            // UPDATE
+            res = await pgClient.query('UPDATE event ' + 
+                'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7 ' + 
+                'WHERE uuid=$8',
+            [event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction, event.uuid]);
+        } else {
+            // INSERT
+            res = await pgClient.query('INSERT INTO event ' + 
+                '(uuid, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
+                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            [uuidv4(), event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
+        }
+        console.log(res.rows[0]) // 
+        //await pgClient.end()
+        } catch (err) {
+            console.log(`Error saving event: ${err.message}`);
+        } 
 }
 
 function uuidv4() {
