@@ -214,6 +214,7 @@ const getEvent = async (guild) => {
         }
     } catch (err) {
         console.log(`Error while getting event: ${err}`);
+        return {};
     }
 }
 
