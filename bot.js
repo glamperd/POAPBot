@@ -127,6 +127,7 @@ const setupState = async (user, guild) => {
     state.next = steps.CHANNEL;
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
+    state.dm.send(`First: which channel do you want me to listen to?`);
     resetExpiry();
 }
 
