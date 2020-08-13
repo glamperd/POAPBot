@@ -124,7 +124,7 @@ const sendDM = async (user, message) => {
 }
 
 const setupState = async (user) => {
-    state.next = step.CHANNEL;
+    state.next = steps.CHANNEL;
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${message.guild.name}? I'll ask for the details, one at a time:`);
     resetExpiry();
@@ -132,49 +132,49 @@ const setupState = async (user) => {
 
 const handleStepAnswer = async (answer) => {
     switch (state.step) {
-        case step.CHANNEL: {
+        case steps.CHANNEL: {
             state.event.channel = answer; // TODO - confirm that guild has this channel
             state.step = step.START;
             state.dm.send(`Date and time to start?`);
             resetExpiry();
             break;
         }
-        case step.START: {
+        case steps.START: {
             state.event.start = Date.parse(answer);
             state.step = step.END;
             state.dm.send(`Date and time to end the event?`);
             resetExpiry();
             break;
         }
-        case step.END: {
+        case steps.END: {
             state.event.end = Date.parse(answer);
             state.step = step.START_MSG;
             state.dm.send(`Message to publish at the start of the event?`);
             resetExpiry();
             break;
         }
-        case step.START_MSG: {
+        case steps.START_MSG: {
             state.event.startMessage = answer;
             state.step = step.END_MSG;
             state.dm.send(`Message to publish to end the event?`);
             resetExpiry();
             break;
         }
-        case step.END_MSG: {
+        case steps.END_MSG: {
             state.event.endMessage = answer;
             state.step = step.RESPONSE;
             state.dm.send(`Response to send privately to members during the event?`);
             resetExpiry();
             break;
         }
-        case step.RESPONSE: {
+        case steps.RESPONSE: {
             state.event.response = answer;
             state.step = step.REACTION;
             state.dm.send(`Reaction to public message by channel members during the event?`);
             resetExpiry();
             break;
         }
-        case step.REACTION: {
+        case steps.REACTION: {
             state.event.reaction = answer;
             state.step = step.NONE;
             state.dm.send(`OK thanks. That's all done.`);
