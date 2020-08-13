@@ -98,7 +98,9 @@ client.on('message', async message => {
                     console.log(`user lacks permission, or invalid command`);
                     message.react('❗');
                 }
-            } else {
+            } else if (state.state === 'EVENT') {
+                // Check that member hasn't already been messaged. - REDIS?
+
                 message.react('👍');
                 const user = message.author;
                 sendDM(user, 'sending u a PM :smile:');
