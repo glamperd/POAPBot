@@ -72,7 +72,7 @@ client.on('message', async message => {
                         // Get any current record for this guild
                         state.event = getEvent(message.guild.name);
                         // set state to SETUP
-                        state = state.SETUP;
+                        state.state = state.SETUP;
                         // start dialog in PM
                         await setupState(message.author);
                     } else if (message.content.includes('!list')) {
@@ -124,46 +124,46 @@ const sendDM = async (user, message) => {
 }
 
 const setupState = async (user) => {
-    this.state.next = steps.CHANNEL;
-    this.state.dm = await user.createDM();
-    this.state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${message.guild.name}? I'll ask for the details, one at a time:`);
+    state.next = steps.CHANNEL;
+    state.dm = await user.createDM();
+    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${message.guild.name}? I'll ask for the details, one at a time:`);
     resetExpiry();
 }
 
 const handleStepAnswer = async (answer) => {
     switch (this.state.step) {
         case steps.CHANNEL: {
-            this.state.event.channel = answer; // TODO - confirm that guild has this channel
-            this.state.step = step.START;
-            this.state.dm.send(`Date and time to start?`);
+            state.event.channel = answer; // TODO - confirm that guild has this channel
+            state.step = step.START;
+            state.dm.send(`Date and time to start?`);
             resetExpiry();
             break;
         }
         case steps.START: {
-            this.state.event.start = Date.parse(answer);
-            this.state.step = step.END;
-            this.state.dm.send(`Date and time to end the event?`);
+            state.event.start = Date.parse(answer);
+            state.step = step.END;
+            state.dm.send(`Date and time to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END: {
-            this.state.event.end = Date.parse(answer);
-            this.state.step = step.START_MSG;
-            this.state.dm.send(`Message to publish at the start of the event?`);
+            state.event.end = Date.parse(answer);
+            state.step = step.START_MSG;
+            state.dm.send(`Message to publish at the start of the event?`);
             resetExpiry();
             break;
         }
         case steps.START_MSG: {
-            this.state.event.startMessage = answer;
-            this.state.step = step.END_MSG;
-            this.state.dm.send(`Message to publish to end the event?`);
+            state.event.startMessage = answer;
+            state.step = step.END_MSG;
+            state.dm.send(`Message to publish to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END_MSG: {
-            this.state.event.endMessage = answer;
-            this.state.step = step.RESPONSE;
-            this.state.dm.send(`Response to send privately to members during the event?`);
+            state.event.endMessage = answer;
+            state.step = step.RESPONSE;
+            state.dm.send(`Response to send privately to members during the event?`);
             resetExpiry();
             break;
         }
