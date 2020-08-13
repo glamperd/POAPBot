@@ -74,7 +74,7 @@ client.on('message', async message => {
                         // set state to SETUP
                         state.state = state.SETUP;
                         // start dialog in PM
-                        await setupState(message.author);
+                        await setupState(message.author, message.guild.name);
                     } else if (message.content.includes('!list')) {
                         console.log(`list event `);
                         const event = getEvent(message.guild.name);
@@ -123,10 +123,10 @@ const sendDM = async (user, message) => {
     dm.send(message);
 }
 
-const setupState = async (user) => {
+const setupState = async (user, guild) => {
     state.next = steps.CHANNEL;
     state.dm = await user.createDM();
-    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${message.guild.name}? I'll ask for the details, one at a time:`);
+    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
     resetExpiry();
 }
 
