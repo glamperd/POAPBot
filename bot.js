@@ -115,7 +115,7 @@ pgClient.on('end', () => {
 })
 
 const checkAndConnectDB = async () => {
-    await pgClient.connect();
+    if (!dbConnected) await pgClient.connect();
 }
 
 const sendDM = async (user, message) => {
