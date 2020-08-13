@@ -33,17 +33,18 @@ const pgClient = new Client({
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
 });
+var dbConnected = false;
 
 client.on('ready', () => {
     console.log('I am ready!');
 
     (async () => {
-        await pgClient.connect()
+        await pgClient.connect();
+        dbConnected = true;
         const res = await pgClient.query('SELECT $1::text as message', ['Hello world!'])
         console.log(res.rows[0].message) // Hello world!
-        await pgClient.end()
-      })()
-      
+        //await pgClient.end()
+      })()      
 });
 
 client.on('message', async message => {
@@ -108,6 +109,14 @@ client.on('message', async message => {
         }
     }
 });
+
+pgClient.on('end', () => {
+    dbConnected = false;
+})
+
+const checkAndConnectDB = async () => {
+    await pgClient.connect();
+}
 
 const sendDM = async (user, message) => {
     const dm = await user.createDM();
@@ -192,7 +201,7 @@ const resetExpiry = () => {
 
 const getEvent = async (guild) => {
     try {
-        //await pgClient.connect();
+        await checkAndConnectDB();
         const res = await pgClient.query('SELECT * FROM event WHERE server = $1', [guild]);
         console.log(`Event retrieved from DB: ${JSON.stringify(res.rows[0])}`);
         //await pgClient.end();
@@ -211,6 +220,7 @@ const getEvent = async (guild) => {
 const saveEvent = async (event) => {
     try {
         //await pgClient.connect();
+        await checkAndConnectDB();
         let res;
         if (state.event.uuid) {
             // UPDATE
