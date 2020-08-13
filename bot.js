@@ -213,7 +213,7 @@ const getEvent = async (guild) => {
             return {};
         }
     } catch (err) {
-        console.log(`Error while getting event: ${err.message}`);
+        console.log(`Error while getting event: ${err}`);
     }
 }
 
@@ -238,7 +238,7 @@ const saveEvent = async (event) => {
         console.log(res.rows[0]) // 
         //await pgClient.end()
         } catch (err) {
-            console.log(`Error saving event: ${err.message}`);
+            console.log(`Error saving event: ${err}`);
         } 
 }
 
