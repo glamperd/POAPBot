@@ -77,14 +77,14 @@ client.on('message', async message => {
                     } else if (message.content.includes('!list')) {
                         console.log(`list event `);
                         const event = getEvent(message.guild.name);
-                        if (event) {
+                        if (event.uuid) {
                             sendDM(message.author, JSON.stringify(event));
                         } else {
                             console.log(`No current event`);
                             sendDM(message.author, `No event is currently set up for ${message.guild.name}`);
                         }
                     } else {
-                        sendDM(message.author, `COmmands are: !setup, !list`);
+                        message.reply(`Commands are: !setup, !list`);
                     }
                 } else {
                     console.log(`user lacks permission, or invalid command`);
