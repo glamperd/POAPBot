@@ -217,9 +217,7 @@ const startEventTimer = (event) => {
     const eventStart = Date.parse(event.start_time);
     const millisecs = eventStart - new Date();
     // set timeout. Call startEvent on timeout
-    state.eventTimer = setTimeout( ()=> {
-        startEvent(event);
-    }, millisecs);
+    state.eventTimer = setTimeout( startEvent(event), millisecs);
 }
 
 const startEvent = async (event) => {
@@ -228,10 +226,9 @@ const startEvent = async (event) => {
     // Send the start message to the channel
 
     const endTime = Date.parse(event.end_time);
+    const millisecs = endTime - new Date();
     // Set timer for event end
-    state.endEventTimer = setTimeout ((event) => {
-        endEvent(event);
-    }, millisecs);
+    state.endEventTimer = setTimeout (endEvent(event), millisecs);
 }
 
 const endEvent = async (event) => {
