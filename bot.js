@@ -247,10 +247,8 @@ const getEvent = async (guild) => {
         const res = await pgClient.query('SELECT * FROM event WHERE server = $1::text', [guild]);
         console.log(`Event retrieved from DB: ${JSON.stringify(res.rows[0])}`);
         //await pgClient.end();
-        if (res.rows.count > 0) {
-            return {
-                ...res.rows[0],
-            };
+        if (res.rows.length > 0) {
+            return res.rows[0];
         } else {
             return {};
         }
