@@ -72,8 +72,6 @@ client.on('message', async message => {
                         console.log(`user has permission`)
                         // Get any current record for this guild
                         state.event = getEvent(message.guild.name);
-                        // set state to SETUP
-                        state.state = state.SETUP;
                         // start dialog in PM
                         await setupState(message.author, message.guild.name);
                     } else if (message.content.includes('!list')) {
@@ -125,6 +123,7 @@ const sendDM = async (user, message) => {
 }
 
 const setupState = async (user, guild) => {
+    state.state = states.SETUP;
     state.next = steps.CHANNEL;
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
@@ -137,49 +136,49 @@ const handleStepAnswer = async (answer) => {
     switch (this.state.step) {
         case steps.CHANNEL: {
             state.event.channel = answer; // TODO - confirm that guild has this channel
-            state.step = step.START;
+            state.step = steps.START;
             state.dm.send(`Date and time to start?`);
             resetExpiry();
             break;
         }
         case steps.START: {
             state.event.start = Date.parse(answer);
-            state.step = step.END;
+            state.step = steps.END;
             state.dm.send(`Date and time to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END: {
             state.event.end = Date.parse(answer);
-            state.step = step.START_MSG;
+            state.step = steps.START_MSG;
             state.dm.send(`Message to publish at the start of the event?`);
             resetExpiry();
             break;
         }
         case steps.START_MSG: {
             state.event.startMessage = answer;
-            state.step = step.END_MSG;
+            state.step = steps.END_MSG;
             state.dm.send(`Message to publish to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END_MSG: {
             state.event.endMessage = answer;
-            state.step = step.RESPONSE;
+            state.step = steps.RESPONSE;
             state.dm.send(`Response to send privately to members during the event?`);
             resetExpiry();
             break;
         }
         case steps.RESPONSE: {
             state.event.response = answer;
-            state.step = step.REACTION;
+            state.step = steps.REACTION;
             state.dm.send(`Reaction to public message by channel members during the event?`);
             resetExpiry();
             break;
         }
         case steps.REACTION: {
             state.event.reaction = answer;
-            state.step = step.NONE;
+            state.step = steps.NONE;
             state.dm.send(`OK thanks. That's all done.`);
             clearTimeout(state.expiry);
             saveEvent(state.event);
@@ -193,7 +192,7 @@ const resetExpiry = () => {
         clearTimeout(state.expiry);
         state.expiry = setTimeout( () => {
             state.dm.send(`Setup expired before answers received. Start again if you wish to comlete setup.`);
-            state.state = state.LISTEN;
+            state.state = states.LISTEN;
             state.dm = undefined;
             state.event = {};
             state.user = undefined;
