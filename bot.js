@@ -77,6 +77,7 @@ client.on('message', async message => {
                     } else if (message.content.includes('!list')) {
                         console.log(`list event `);
                         const event = await getEvent(message.guild.name);
+                        console.log(`event ${JSON.stringify(event)}`);
                         if (event.id) {
                             sendDM(message.author, JSON.stringify(event));
                         } else {
