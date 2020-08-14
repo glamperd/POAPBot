@@ -129,6 +129,7 @@ const setupState = async (user, guild) => {
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
     state.dm.send(`First: which channel do you want me to listen to?`);
     state.user = user;
+    state.event.guild = guild;
     resetExpiry();
 }
 
@@ -182,6 +183,10 @@ const handleStepAnswer = async (answer) => {
             state.dm.send(`OK thanks. That's all done.`);
             clearTimeout(state.expiry);
             saveEvent(state.event);
+            clearTimeout(state.expiry);
+            clearSetup();
+            // Set timer for event start
+
             break;
         }
     }
@@ -192,13 +197,17 @@ const resetExpiry = () => {
         clearTimeout(state.expiry);
         state.expiry = setTimeout( () => {
             state.dm.send(`Setup expired before answers received. Start again if you wish to comlete setup.`);
-            state.state = states.LISTEN;
-            state.dm = undefined;
-            state.event = {};
-            state.user = undefined;
-            state.next = steps.NONE;
+            clearSetup();
         }, 300000 );
     }
+}
+
+const clearSetup = () => {
+    state.state = states.LISTEN;
+    state.dm = undefined;
+    state.event = {};
+    state.user = undefined;
+    state.next = steps.NONE;
 }
 
 const getEvent = async (guild) => {
@@ -241,11 +250,11 @@ const saveEvent = async (event) => {
                 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [uuid, event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
         }
-        console.log(res.rows[0]) // 
+        //console.log(res.rows[0]) // 
         //await pgClient.end()
-        } catch (err) {
-            console.log(`Error saving event: ${err}`);
-        } 
+    } catch (err) {
+        console.log(`Error saving event: ${err}`);
+    } 
 }
 
 function uuidv4() {
