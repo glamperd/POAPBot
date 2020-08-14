@@ -133,52 +133,52 @@ const setupState = async (user, guild) => {
 }
 
 const handleStepAnswer = async (answer) => {
-    switch (this.state.step) {
+    switch (state.next) {
         case steps.CHANNEL: {
             state.event.channel = answer; // TODO - confirm that guild has this channel
-            state.step = steps.START;
+            state.next = steps.START;
             state.dm.send(`Date and time to start?`);
             resetExpiry();
             break;
         }
         case steps.START: {
             state.event.start = Date.parse(answer);
-            state.step = steps.END;
+            state.next = steps.END;
             state.dm.send(`Date and time to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END: {
             state.event.end = Date.parse(answer);
-            state.step = steps.START_MSG;
+            state.next = steps.START_MSG;
             state.dm.send(`Message to publish at the start of the event?`);
             resetExpiry();
             break;
         }
         case steps.START_MSG: {
             state.event.startMessage = answer;
-            state.step = steps.END_MSG;
+            state.next = steps.END_MSG;
             state.dm.send(`Message to publish to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END_MSG: {
             state.event.endMessage = answer;
-            state.step = steps.RESPONSE;
+            state.next = steps.RESPONSE;
             state.dm.send(`Response to send privately to members during the event?`);
             resetExpiry();
             break;
         }
         case steps.RESPONSE: {
             state.event.response = answer;
-            state.step = steps.REACTION;
+            state.next = steps.REACTION;
             state.dm.send(`Reaction to public message by channel members during the event?`);
             resetExpiry();
             break;
         }
         case steps.REACTION: {
             state.event.reaction = answer;
-            state.step = steps.NONE;
+            state.next = steps.NONE;
             state.dm.send(`OK thanks. That's all done.`);
             clearTimeout(state.expiry);
             saveEvent(state.event);
