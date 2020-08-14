@@ -287,7 +287,7 @@ const saveEvent = async (event) => {
     } 
 }
 
-const loadPendingEvents = () => {
+const loadPendingEvents = async () => {
     // read all events that will start or end in the future.
     try {
         await checkAndConnectDB();
