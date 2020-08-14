@@ -54,7 +54,8 @@ client.on('message', async message => {
     else if (!message.author.bot) {
         if (message.channel.type === 'dm') {
             console.log(`DM Message ${message.content} from ${message.author.username} in ${message.channel.type}`);
-            if (state.SETUP && 
+            console.log(`state ${state.state} user ${state.user.id}`);
+            if (state.state === states.SETUP && 
                 state.user.id === message.author.id) {
                 handleStepAnswer(message.content);
             }
