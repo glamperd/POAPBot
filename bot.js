@@ -54,7 +54,7 @@ client.on('message', async message => {
     else if (!message.author.bot) {
         if (message.channel.type === 'dm') {
             console.log(`DM Message ${message.content} from ${message.author.username} in ${message.channel.type}`);
-            console.log(`state ${state.state} user ${state.user.id}`);
+            console.log(`state ${state.state} user ${state.user ? state.user.id : '-'}`);
             if (state.state === states.SETUP && 
                 state.user.id === message.author.id) {
                 handleStepAnswer(message.content);
@@ -76,7 +76,7 @@ client.on('message', async message => {
                         await setupState(message.author, message.guild.name);
                     } else if (message.content.includes('!list')) {
                         console.log(`list event `);
-                        const event = getEvent(message.guild.name);
+                        const event = await getEvent(message.guild.name);
                         if (event.uuid) {
                             sendDM(message.author, JSON.stringify(event));
                         } else {
@@ -85,7 +85,7 @@ client.on('message', async message => {
                         }
                     } else if (message.content.includes('!status')) {
                         console.log(`status request`);
-                        const event = getEvent(message.guild.name);
+                        const event = await getEvent(message.guild.name);
                         if (event.uuid) {
                             sendDM(message.author, JSON.stringify(event));
                         } else {
