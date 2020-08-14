@@ -142,14 +142,14 @@ const handleStepAnswer = async (answer) => {
             break;
         }
         case steps.START: {
-            state.event.start = Date.parse(answer);
+            state.event.start = answer;
             state.next = steps.END;
             state.dm.send(`Date and time to end the event?`);
             resetExpiry();
             break;
         }
         case steps.END: {
-            state.event.end = Date.parse(answer);
+            state.event.end = answer;
             state.next = steps.START_MSG;
             state.dm.send(`Message to publish at the start of the event?`);
             resetExpiry();
