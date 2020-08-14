@@ -77,7 +77,7 @@ client.on('message', async message => {
                     } else if (message.content.includes('!list')) {
                         console.log(`list event `);
                         const event = await getEvent(message.guild.name);
-                        if (event.uuid) {
+                        if (event.id) {
                             sendDM(message.author, JSON.stringify(event));
                         } else {
                             console.log(`No current event`);
@@ -86,7 +86,7 @@ client.on('message', async message => {
                     } else if (message.content.includes('!status')) {
                         console.log(`status request`);
                         const event = await getEvent(message.guild.name);
-                        if (event.uuid) {
+                        if (event.id) {
                             sendDM(message.author, JSON.stringify(event));
                         } else {
                             sendDM(message.author, `Current status: ${state.state}`);
@@ -186,7 +186,7 @@ const handleStepAnswer = async (answer) => {
             clearTimeout(state.expiry);
             clearSetup();
             // Set timer for event start
-
+            startEventTimer(state.event);
             break;
         }
     }
@@ -210,6 +210,36 @@ const clearSetup = () => {
     state.next = steps.NONE;
 }
 
+const startEventTimer = (event) => {
+    // get seconds until event start
+    const eventStart = Date.parse(event.start_time);
+    const millisecs = eventStart - new Date();
+    // set timeout. Call startEvent on timeout
+    state.eventTimer = setTimeout( ()=> {
+        startEvent(event);
+    }, millisecs);
+}
+
+const startEvent = async (event) => {
+    console.log(`event started: ${JSON.stringify(event)}`);
+    state.state = states.EVENT;
+    // Send the start message to the channel
+
+    const endTime = Date.parse(event.end_time);
+    // Set timer for event end
+    state.endEventTimer = setTimeout ((event) => {
+        endEvent(event);
+    }, millisecs);
+}
+
+const endEvent = async (event) => {
+    console.log(`event ended: ${JSON.stringify(event)}`);
+    state.state = states.LISTEN;
+    // send the event end message
+       
+}
+
+// DB functions
 const getEvent = async (guild) => {
     try {
         await checkAndConnectDB();
