@@ -234,7 +234,7 @@ const saveEvent = async (event) => {
         } else {
             // INSERT
             res = await pgClient.query('INSERT INTO event ' + 
-                '(uuid, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
+                '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
                 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [uuidv4(), event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
         }
