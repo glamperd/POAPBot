@@ -44,6 +44,8 @@ client.on('ready', () => {
         const res = await pgClient.query('SELECT $1::text as message', ['Hello world!'])
         console.log(res.rows[0].message) // Hello world!
         //await pgClient.end()
+
+        loadPendingEvents();
       })()      
 });
 
@@ -86,11 +88,10 @@ client.on('message', async message => {
                         }
                     } else if (message.content.includes('!status')) {
                         console.log(`status request`);
+                        sendDM(message.author, `Current status: ${state.state}`);
                         const event = await getEvent(message.guild.name);
                         if (event.id) {
-                            sendDM(message.author, JSON.stringify(event));
-                        } else {
-                            sendDM(message.author, `Current status: ${state.state}`);
+                            sendDM(message.author, `Event: ${JSON.stringify(event)}`);
                         }
                     } else {
                         message.reply(`Commands are: !setup, !list, !status`);
@@ -284,6 +285,23 @@ const saveEvent = async (event) => {
     } catch (err) {
         console.log(`Error saving event: ${err}`);
     } 
+}
+
+const loadPendingEvents = () => {
+    // read all events that will start or end in the future.
+    try {
+        await checkAndConnectDB();
+        const res = await pgClient.query('SELECT * FROM event WHERE end_time >= $1::date', [new Date()]);
+        console.log(`Future events loaded: ${JSON.stringify(res.rows)}`);
+        if (res.rows.length > 0) {
+            // start timer for each one. 
+            res.rows.forEach(row => {
+                startEvent(row);
+            });
+        }
+    } catch (err) {
+        console.log(`Error while getting event: ${err}`);
+    }
 }
 
 function uuidv4() {
