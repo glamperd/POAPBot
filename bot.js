@@ -228,7 +228,7 @@ const startEvent = async (event) => {
     const endTime = Date.parse(event.end_time);
     const millisecs = endTime - new Date();
     // Set timer for event end
-    state.endEventTimer = setTimeout (endEvent(event), millisecs);
+    state.endEventTimer = setTimeout((event) => endEvent(event), millisecs, event);
 }
 
 const endEvent = async (event) => {
