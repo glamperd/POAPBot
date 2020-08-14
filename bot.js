@@ -227,16 +227,19 @@ const saveEvent = async (event) => {
         let res;
         if (state.event.uuid) {
             // UPDATE
+            console.log(`Updating... ${uuid} to ${JSON.stringify(event)}`);
             res = await pgClient.query('UPDATE event ' + 
                 'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7 ' + 
-                'WHERE uuid=$8',
+                'WHERE id=$8',
             [event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction, event.uuid]);
         } else {
+            const uuid = uuidv4();
+            console.log(`Inserting... ${uuid} to ${JSON.stringify(event)}`);
             // INSERT
             res = await pgClient.query('INSERT INTO event ' + 
                 '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
                 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-            [uuidv4(), event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
+            [uuid, event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
         }
         console.log(res.rows[0]) // 
         //await pgClient.end()
