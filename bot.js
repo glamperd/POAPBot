@@ -213,7 +213,7 @@ const startEventTimer = (event) => {
     // get seconds until event start
     const eventStart = Date.parse(event.start_time);
     const millisecs = eventStart - (new Date());
-    console.log(`Event starting at ${eventStart}, in ${millisecs/100} secs`);
+    console.log(`Event starting at ${eventStart}, in ${millisecs/1000} secs`);
     // set timeout. Call startEvent on timeout
     state.eventTimer = setTimeout( startEvent(event), millisecs, event);
 }
@@ -226,7 +226,7 @@ const startEvent = async (event) => {
 
     const endTime = Date.parse(event.end_time);
     const millisecs = endTime - new Date();
-    console.log(`Event ending in ${millisecs/100} secs`);
+    console.log(`Event ending in ${millisecs/1000} secs`);
     // Set timer for event end
     state.endEventTimer = setTimeout((event) => endEvent(event), millisecs, event);
 }
