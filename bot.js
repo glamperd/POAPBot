@@ -36,12 +36,12 @@ const pgClient = new Client({
 var dbConnected = false;
 
 client.on('ready', () => {
-    console.log('I am ready!');
+    console.log('Discord client ready!');
 
     (async () => {
         await pgClient.connect();
         dbConnected = true;
-        const res = await pgClient.query('SELECT $1::text as message', ['Hello world!'])
+        const res = await pgClient.query('SELECT $1::text as message', ['DB ready'])
         console.log(res.rows[0].message) // Hello world!
         //await pgClient.end()
 
@@ -131,52 +131,49 @@ const setupState = async (user, guild) => {
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
     state.dm.send(`First: which channel do you want me to listen to?`);
     state.user = user;
-    state.event.guild = guild;
+    state.event = getEvent(guild);
+    if (!state.event.id) { state.event.guild = guild; }
     resetExpiry();
 }
 
 const handleStepAnswer = async (answer) => {
+    resetExpiry();
     switch (state.next) {
         case steps.CHANNEL: {
+            if (answer.startWith('#')) answer = answer.substring(1);
             state.event.channel = answer; // TODO - confirm that guild has this channel
             state.next = steps.START;
             state.dm.send(`Date and time to start?`);
-            resetExpiry();
             break;
         }
         case steps.START: {
             state.event.start = answer;
             state.next = steps.END;
             state.dm.send(`Date and time to end the event?`);
-            resetExpiry();
             break;
         }
         case steps.END: {
             state.event.end = answer;
             state.next = steps.START_MSG;
             state.dm.send(`Message to publish at the start of the event?`);
-            resetExpiry();
             break;
         }
         case steps.START_MSG: {
             state.event.startMessage = answer;
             state.next = steps.END_MSG;
             state.dm.send(`Message to publish to end the event?`);
-            resetExpiry();
             break;
         }
         case steps.END_MSG: {
             state.event.endMessage = answer;
             state.next = steps.RESPONSE;
             state.dm.send(`Response to send privately to members during the event?`);
-            resetExpiry();
             break;
         }
         case steps.RESPONSE: {
             state.event.response = answer;
             state.next = steps.REACTION;
             state.dm.send(`Reaction to public message by channel members during the event?`);
-            resetExpiry();
             break;
         }
         case steps.REACTION: {
@@ -215,8 +212,8 @@ const clearSetup = () => {
 const startEventTimer = (event) => {
     // get seconds until event start
     const eventStart = Date.parse(event.start_time);
-    const millisecs = eventStart - new Date();
-    console.log(`Event starting in ${millisecs/100} secs`);
+    const millisecs = eventStart - (new Date());
+    console.log(`Event starting at ${eventStart}, in ${millisecs/100} secs`);
     // set timeout. Call startEvent on timeout
     state.eventTimer = setTimeout( startEvent(event), millisecs, event);
 }
@@ -243,8 +240,17 @@ const endEvent = async (event) => {
 }
 
 const sendMessageToChannel = async (guildName, channelName, message) => {
+    console.log(`sendMessageToChannel ${guildName} ${channelName} msg ${message}`);
     const guild = client.guilds.cache.find(guild => (guild.name === guildName));
+    if (!guild) {
+        console.log(`Guild not found! Client guilds: ${client.guilds.cache}`);
+        return;
+    }
     const channel = guild.channels.cache.find(channel => (channel.name === channelName));
+    if (!channel) {
+        console.log(`Channel not found! Guild channels: ${guild.channels.cache}`);
+        return;
+    }
     channel.send(message);
 }
 
@@ -271,9 +277,9 @@ const saveEvent = async (event) => {
         //await pgClient.connect();
         await checkAndConnectDB();
         let res;
-        if (state.event.uuid) {
+        if (state.event.id) {
             // UPDATE
-            console.log(`Updating... ${uuid} to ${JSON.stringify(event)}`);
+            console.log(`Updating... ${event.id} to ${JSON.stringify(event)}`);
             res = await pgClient.query('UPDATE event ' + 
                 'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7 ' + 
                 'WHERE id=$8',
