@@ -140,7 +140,7 @@ const handleStepAnswer = async (answer) => {
     resetExpiry();
     switch (state.next) {
         case steps.CHANNEL: {
-            if (answer.startWith('#')) answer = answer.substring(1);
+            if (answer.startsWith('#')) answer = answer.substring(1);
             state.event.channel = answer; // TODO - confirm that guild has this channel
             state.next = steps.START;
             state.dm.send(`Date and time to start?`);
@@ -309,7 +309,7 @@ const loadPendingEvents = async () => {
         if (res.rows.length > 0) {
             // start timer for each one. 
             res.rows.forEach(row => {
-                startEvent(row);
+                startEventTimer(row);
             });
         } else {
             console.log('No pending events');
