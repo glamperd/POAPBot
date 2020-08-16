@@ -18,7 +18,7 @@ const steps = {
 };
 var state = {
     state: states.LISTEN,
-    expiry: new Date(),
+    expiry: 0,
     user: undefined,
     next: steps.NONE,
     event: {},
@@ -73,7 +73,7 @@ client.on('message', async message => {
                         state.state !== states.SETUP) {// one at a time
                         console.log(`user has permission`)
                         // Get any current record for this guild
-                        state.event = getEvent(message.guild.name);
+                        //state.event = getEvent(message.guild.name);
                         // start dialog in PM
                         await setupState(message.author, message.guild.name);
                     } else if (message.content.includes('!list')) {
@@ -127,11 +127,11 @@ const sendDM = async (user, message) => {
 const setupState = async (user, guild) => {
     state.state = states.SETUP;
     state.next = steps.CHANNEL;
+    state.event = getEvent(guild);
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
     state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
     state.user = user;
-    state.event = getEvent(guild);
     if (!state.event.id) { state.event.server = guild; }
     resetExpiry();
 }
@@ -181,7 +181,7 @@ const handleStepAnswer = async (answer) => {
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
             clearTimeout(state.expiry);
-            saveEvent(state.event);
+            await saveEvent(state.event);
             // Set timer for event start
             startEventTimer(state.event);
             clearSetup();
@@ -276,7 +276,7 @@ const saveEvent = async (event) => {
         //await pgClient.connect();
         await checkAndConnectDB();
         let res;
-        if (state.event.id) {
+        if (event.id) {
             // UPDATE
             console.log(`Updating... ${event.id} to ${JSON.stringify(event)}`);
             res = await pgClient.query('UPDATE event ' + 
@@ -292,8 +292,6 @@ const saveEvent = async (event) => {
                 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [uuid, event.server, event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction]);
         }
-        //console.log(res.rows[0]) // 
-        //await pgClient.end()
     } catch (err) {
         console.log(`Error saving event: ${err}`);
     } 
