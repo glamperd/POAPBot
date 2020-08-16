@@ -129,10 +129,10 @@ const setupState = async (user, guild) => {
     state.next = steps.CHANNEL;
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
-    state.dm.send(`First: which channel do you want me to listen to?`);
+    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel | ''})`);
     state.user = user;
     state.event = getEvent(guild);
-    if (!state.event.id) { state.event.guild = guild; }
+    if (!state.event.id) { state.event.server = guild; }
     resetExpiry();
 }
 
@@ -143,37 +143,37 @@ const handleStepAnswer = async (answer) => {
             if (answer.startsWith('#')) answer = answer.substring(1);
             state.event.channel = answer; // TODO - confirm that guild has this channel
             state.next = steps.START;
-            state.dm.send(`Date and time to start?`);
+            state.dm.send(`Date and time to start? ${state.event.start_time | ''}`);
             break;
         }
         case steps.START: {
-            state.event.start = answer;
+            state.event.start_time = answer;
             state.next = steps.END;
-            state.dm.send(`Date and time to end the event?`);
+            state.dm.send(`Date and time to end the event? (${state.event.end_time | ''})`);
             break;
         }
         case steps.END: {
-            state.event.end = answer;
+            state.event.end_time = answer;
             state.next = steps.START_MSG;
-            state.dm.send(`Message to publish at the start of the event?`);
+            state.dm.send(`Message to publish at the start of the event? (${state.event.start_message | 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.'})`);
             break;
         }
         case steps.START_MSG: {
-            state.event.startMessage = answer;
+            state.event.start_message = answer;
             state.next = steps.END_MSG;
-            state.dm.send(`Message to publish to end the event?`);
+            state.dm.send(`Message to publish to end the event? (${state.event.end_message | 'The POAP distribution event has ended.' })`);
             break;
         }
         case steps.END_MSG: {
-            state.event.endMessage = answer;
+            state.event.end_message = answer;
             state.next = steps.RESPONSE;
-            state.dm.send(`Response to send privately to members during the event?`);
+            state.dm.send(`Response to send privately to members during the event? (${state.event.response_message | ''})`);
             break;
         }
         case steps.RESPONSE: {
-            state.event.response = answer;
+            state.event.response_message = answer;
             state.next = steps.REACTION;
-            state.dm.send(`Reaction to public message by channel members during the event?`);
+            state.dm.send(`Reaction to public message by channel members during the event? (${state.event.reaction | ':thumbsup:'})`);
             break;
         }
         case steps.REACTION: {
@@ -222,7 +222,7 @@ const startEvent = async (event) => {
     console.log(`event started: ${JSON.stringify(event)}`);
     state.state = states.EVENT;
     // Send the start message to the channel
-    sendMessageToChannel(event.guild, event.channel, event.startMessage);
+    sendMessageToChannel(event.server, event.channel, event.start_message);
 
     const endTime = Date.parse(event.end_time);
     const millisecs = endTime - new Date();
@@ -235,7 +235,7 @@ const endEvent = async (event) => {
     console.log(`event ended: ${JSON.stringify(event)}`);
     state.state = states.LISTEN;
     // send the event end message
-    sendMessageToChannel(event.guild, event.channel, event.endMessage);
+    sendMessageToChannel(event.server, event.channel, event.end_message);
        
 }
 
@@ -248,7 +248,7 @@ const sendMessageToChannel = async (guildName, channelName, message) => {
     }
     const channel = guild.channels.cache.find(channel => (channel.name === channelName));
     if (!channel) {
-        console.log(`Channel not found! Guild channels: ${guild.channels.cache}`);
+        console.log(`Channel not found! Guild channels: ${guild.channels.cache.size}`);
         return;
     }
     channel.send(message);
@@ -283,7 +283,7 @@ const saveEvent = async (event) => {
             res = await pgClient.query('UPDATE event ' + 
                 'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7 ' + 
                 'WHERE id=$8',
-            [event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction, event.uuid]);
+            [event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction, event.id]);
         } else {
             const uuid = uuidv4();
             console.log(`Inserting... ${uuid} to ${JSON.stringify(event)}`);
@@ -291,7 +291,7 @@ const saveEvent = async (event) => {
             res = await pgClient.query('INSERT INTO event ' + 
                 '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
                 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-            [uuid, event.guild, event.channel, event.start, event.end, event.startMessage, event.endMessage, event.response, event.reaction]);
+            [uuid, event.server, event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction]);
         }
         //console.log(res.rows[0]) // 
         //await pgClient.end()
