@@ -129,7 +129,7 @@ const setupState = async (user, guild) => {
     state.next = steps.CHANNEL;
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
-    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel | ''})`);
+    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
     state.user = user;
     state.event = getEvent(guild);
     if (!state.event.id) { state.event.server = guild; }
@@ -143,49 +143,48 @@ const handleStepAnswer = async (answer) => {
             if (answer.startsWith('#')) answer = answer.substring(1);
             state.event.channel = answer; // TODO - confirm that guild has this channel
             state.next = steps.START;
-            state.dm.send(`Date and time to start? ${state.event.start_time | ''}`);
+            state.dm.send(`Date and time to start? ${state.event.start_time || ''}`);
             break;
         }
         case steps.START: {
             state.event.start_time = answer;
             state.next = steps.END;
-            state.dm.send(`Date and time to end the event? (${state.event.end_time | ''})`);
+            state.dm.send(`Date and time to end the event? (${state.event.end_time || ''})`);
             break;
         }
         case steps.END: {
             state.event.end_time = answer;
             state.next = steps.START_MSG;
-            state.dm.send(`Message to publish at the start of the event? (${state.event.start_message | 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.'})`);
+            state.dm.send(`Message to publish at the start of the event? (${state.event.start_message || 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.'})`);
             break;
         }
         case steps.START_MSG: {
             state.event.start_message = answer;
             state.next = steps.END_MSG;
-            state.dm.send(`Message to publish to end the event? (${state.event.end_message | 'The POAP distribution event has ended.' })`);
+            state.dm.send(`Message to publish to end the event? (${state.event.end_message || 'The POAP distribution event has ended.' })`);
             break;
         }
         case steps.END_MSG: {
             state.event.end_message = answer;
             state.next = steps.RESPONSE;
-            state.dm.send(`Response to send privately to members during the event? (${state.event.response_message | ''})`);
+            state.dm.send(`Response to send privately to members during the event? (${state.event.response_message || ''})`);
             break;
         }
         case steps.RESPONSE: {
             state.event.response_message = answer;
             state.next = steps.REACTION;
-            state.dm.send(`Reaction to public message by channel members during the event? (${state.event.reaction | ':thumbsup:'})`);
+            state.dm.send(`Reaction to public message by channel members during the event? (${state.event.reaction || ':thumbsup:'})`);
             break;
         }
         case steps.REACTION: {
             state.event.reaction = answer;
             state.next = steps.NONE;
-            state.dm.send(`OK thanks. That's all done.`);
+            state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
             clearTimeout(state.expiry);
             saveEvent(state.event);
-            clearTimeout(state.expiry);
-            clearSetup();
             // Set timer for event start
             startEventTimer(state.event);
+            clearSetup();
             break;
         }
     }
