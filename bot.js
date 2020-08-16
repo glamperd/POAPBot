@@ -216,17 +216,20 @@ const startEventTimer = (event) => {
     // get seconds until event start
     const eventStart = Date.parse(event.start_time);
     const millisecs = eventStart - new Date();
+    console.log(`Event starting in ${millisecs/100} secs`);
     // set timeout. Call startEvent on timeout
-    state.eventTimer = setTimeout( startEvent(event), millisecs);
+    state.eventTimer = setTimeout( startEvent(event), millisecs, event);
 }
 
 const startEvent = async (event) => {
     console.log(`event started: ${JSON.stringify(event)}`);
     state.state = states.EVENT;
     // Send the start message to the channel
+    sendMessageToChannel(event.guild, event.channel, event.startMessage);
 
     const endTime = Date.parse(event.end_time);
     const millisecs = endTime - new Date();
+    console.log(`Event ending in ${millisecs/100} secs`);
     // Set timer for event end
     state.endEventTimer = setTimeout((event) => endEvent(event), millisecs, event);
 }
@@ -235,7 +238,14 @@ const endEvent = async (event) => {
     console.log(`event ended: ${JSON.stringify(event)}`);
     state.state = states.LISTEN;
     // send the event end message
+    sendMessageToChannel(event.guild, event.channel, event.endMessage);
        
+}
+
+const sendMessageToChannel = async (guildName, channelName, message) => {
+    const guild = client.guilds.cache.find(guild => (guild.name === guildName));
+    const channel = guild.channels.cache.find(channel => (channel.name === channelName));
+    channel.send(message);
 }
 
 // DB functions
@@ -295,6 +305,8 @@ const loadPendingEvents = async () => {
             res.rows.forEach(row => {
                 startEvent(row);
             });
+        } else {
+            console.log('No pending events');
         }
     } catch (err) {
         console.log(`Error while getting event: ${err}`);
