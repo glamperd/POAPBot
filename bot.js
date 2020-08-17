@@ -466,9 +466,11 @@ redisClient.on('connect', () => {
 
 const clearEventSet = async (guild) => {
     // remove any members from the guild's set. Called prior to an event's start.
-    await delAsync(guild, (err, result) => {
+    const rem = await delAsync(guild, (err, result) => {
         console.log(`Set deleted: ${guild} - ${err} -  ${result} keys removed`);
+        return result;
     });
+    console.log(`Set removed ${rem}`);
 }
 
 // const isSetMember = async (guild, member) => {
@@ -484,14 +486,13 @@ const clearEventSet = async (guild) => {
 const addToSet = async (guild, member) => {
     // adds a user to an event's set
     // returns 0 if already in the set, 1 otherwise
-    let count = 0;
     let c = await saddAsync(guild, member, (err, result) => {
         console.log(`Redis SADD -  error ${err} result ${result}`);
         if (err) return 0;
-        count = result;
+        return result;
     });
-    console.log(`addToSet ${c} ${count}`);
-    return count;
+    console.log(`addToSet ${c}`);
+    return c;
 } 
 //-------------------------------------------------------------------------------------------
 
