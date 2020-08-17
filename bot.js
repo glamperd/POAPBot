@@ -78,9 +78,9 @@ const handlePublicMessage = async (message) => {
     const bot = client.user;
     //console.log(`bot user ID ${bot.id} ${bot.username}`);
 
-    if (state.state === states.EVENT &&
-        state.event.server === message.channel.guild.name && 
-        state.event.channel === message.channel.name) {
+    const event = getGuildEvent(message.channel.guild.name);
+
+    if (eventIsCurrent(event, message.channel.name)) {
 
         // In-event message. Respond with reaction and DM
         handleEventMessage(message);
@@ -222,6 +222,12 @@ const clearSetup = () => {
     state.event = {};
     state.user = undefined;
     state.next = steps.NONE;
+}
+
+const eventIsCurrent = (event, channel) => {
+    if (!event) return false;
+    if (event.channel !== channel) return false;
+    return (getMillisecsUntil(event.start_time)<0 && getMillisecsUntil(event.end_time)>0);
 }
 
 const startEventTimer = (event) => {
