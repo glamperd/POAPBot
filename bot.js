@@ -247,7 +247,7 @@ const startEvent = async (event) => {
 }
 
 const getMillisecsUntil = (time) => {
-    const millisecs = Date.parse(time) - new Date();
+    return Date.parse(time) - new Date();
 }
 
 const endEvent = async (event) => {
@@ -255,7 +255,7 @@ const endEvent = async (event) => {
     state.state = states.LISTEN;
     // send the event end message
     sendMessageToChannel(event.server, event.channel, event.end_message);
-    updateEventUserCount(event);       
+    updateEventUserCount(event);
 }
 
 const sendMessageToChannel = async (guildName, channelName, message) => {
