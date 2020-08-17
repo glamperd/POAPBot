@@ -52,8 +52,7 @@ client.on('ready', () => {
 client.on('message', async message => {
     if (message.content === 'ping') {
        message.reply('pong');
-    }
-    else if (!message.author.bot) {
+    } else if (!message.author.bot) {
         if (message.channel.type === 'dm') {
             console.log(`DM Message ${message.content} from ${message.author.username} in ${message.channel.type}`);
             console.log(`state ${state.state} user ${state.user ? state.user.id : '-'}`);
@@ -62,62 +61,10 @@ client.on('message', async message => {
                 handleStepAnswer(message.content);
             }
         } else {
-            console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
-            const bot = client.user;
-            console.log(`bot user ID ${bot.id} ${bot.username}`);
-
-            if (message.mentions.has(bot)) {
-                console.log(`Message mentions me`);
-                if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {// Check that user is an admin in this guild                     
-                    if (message.content.includes('!setup') &&
-                        state.state !== states.SETUP) {// one at a time
-                        console.log(`user has permission`)
-                        // Get any current record for this guild
-                        //state.event = getEvent(message.guild.name);
-                        // start dialog in PM
-                        await setupState(message.author, message.guild.name);
-                    } else if (message.content.includes('!list')) {
-                        console.log(`list event `);
-                        const event = await getEvent(message.guild.name);
-                        console.log(`event ${JSON.stringify(event)}`);
-                        if (event.id) {
-                            sendDM(message.author, JSON.stringify(event));
-                        } else {
-                            console.log(`No current event`);
-                            sendDM(message.author, `No event is currently set up for ${message.guild.name}`);
-                        }
-                    } else if (message.content.includes('!status')) {
-                        console.log(`status request`);
-                        sendDM(message.author, `Current status: ${state.state}`);
-                        const event = await getEvent(message.guild.name);
-                        if (event.id) {
-                            sendDM(message.author, `Event: ${JSON.stringify(event)}`);
-                        }
-                    } else {
-                        message.reply(`Commands are: !setup, !list, !status`);
-                    }
-                } else {
-                    console.log(`user lacks permission, or invalid command`);
-                    message.react('❗');
-                }
-            } else if (state.state === 'EVENT') {
-                // Check that member hasn't already been messaged. - REDIS?
-
-                message.react('👍');
-                const user = message.author;
-                sendDM(user, 'sending u a PM :smile:');
-            }
+            handlePublicMessage(message);
         }
     }
 });
-
-pgClient.on('end', () => {
-    dbConnected = false;
-})
-
-const checkAndConnectDB = async () => {
-    if (!dbConnected) await pgClient.connect();
-}
 
 const sendDM = async (user, message) => {
     const dm = await user.createDM();
@@ -134,6 +81,55 @@ const setupState = async (user, guild) => {
     state.user = user;
     if (!state.event.id) { state.event.server = guild; }
     resetExpiry();
+}
+
+const handlePublicMessage = async (message) => {
+    console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
+    const bot = client.user;
+    console.log(`bot user ID ${bot.id} ${bot.username}`);
+
+    if (state.state === states.EVENT && state.event.channel === message.channel) {
+
+        // In-event message. Respond with reaction and DM
+        handleEventMessage(message);
+
+    } else if (message.mentions.has(bot)) {
+
+        console.log(`Message mentions me`);
+        if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {// Check that user is an admin in this guild                     
+            if (message.content.includes('!setup') &&
+                state.state !== states.SETUP) {// one at a time
+                console.log(`user has permission`)
+                // Get any current record for this guild
+                //state.event = getEvent(message.guild.name);
+                // start dialog in PM
+                await setupState(message.author, message.guild.name);
+            } else if (message.content.includes('!list')) {
+                console.log(`list event `);
+                const event = await getEvent(message.guild.name);
+                console.log(`event ${JSON.stringify(event)}`);
+                if (event.id) {
+                    sendDM(message.author, formattedEvent(event));
+                } else {
+                    console.log(`No current event`);
+                    sendDM(message.author, `No event is currently set up for ${message.guild.name}`);
+                }
+            } else if (message.content.includes('!status')) {
+                console.log(`status request`);
+                sendDM(message.author, `Current status: ${state.state}`);
+                const event = await getEvent(message.guild.name);
+                if (event.id) {
+                    sendDM(message.author, `Event: ${formattedEvent(event)}`);
+                }
+            } else {
+                message.reply(`Commands are: !setup, !list, !status`);
+            }
+        } else {
+            console.log(`user lacks permission, or invalid command`);
+            message.react('❗');
+        }
+    }
+
 }
 
 const handleStepAnswer = async (answer) => {
@@ -253,7 +249,36 @@ const sendMessageToChannel = async (guildName, channelName, message) => {
     channel.send(message);
 }
 
+const handleEventMessage = async (message) => {
+    // Check whether already responded (Redis)
+
+    // Send DM
+    sendDM(message.author, state.event.response_message);
+    // Add reaction
+    message.react(state.event.reaction);
+}
+
+const formattedEvent = (event) => {
+    return `Event in guild: ${event.guild}\n
+    Channel: ${event.channel}\n
+    Start: ${event.start_time}\n
+    End: ${event.end_time}\n
+    Event start message: ${event.start_message}\n
+    Event end message: ${event.end_message}\n
+    Response to member messages: ${event.response_message}\n
+    Reaction to awarded messages: ${event.reaction}\n
+    Members awarded: ${event.user_count}`;
+}
+
 // DB functions
+pgClient.on('end', () => {
+    dbConnected = false;
+})
+
+const checkAndConnectDB = async () => {
+    if (!dbConnected) await pgClient.connect();
+}
+
 const getEvent = async (guild) => {
     try {
         await checkAndConnectDB();
