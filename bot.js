@@ -457,7 +457,7 @@ function uuidv4() {
 // Redis
 
 const saddAsync = promisify(redisClient.sadd).bind(redisClient);
-const sismemberAsync = promisify(redisClient.sismmember).bind(redisClient);
+//const sismemberAsync = promisify(redisClient.sismember).bind(redisClient);
 const delAsync = promisify(redisClient.del).bind(redisClient);
 
 redisClient.on('connect', () => {
@@ -471,15 +471,15 @@ const clearEventSet = async (guild) => {
     });
 }
 
-const isSetMember = async (guild, member) => {
-    // returns true if a member (discord user) is already in the event's set 
-    let count = 0;
-    await sismemberAsync(guild, member, (err, result) => {
-        if (err) return 0;
-        count = result;
-    });
-    return count;
-}
+// const isSetMember = async (guild, member) => {
+//     // returns true if a member (discord user) is already in the event's set 
+//     let count = 0;
+//     await sismemberAsync(guild, member, (err, result) => {
+//         if (err) return 0;
+//         count = result;
+//     });
+//     return count;
+// }
 
 const addToSet = async (guild, member) => {
     // adds a user to an event's set
