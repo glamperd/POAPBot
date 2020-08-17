@@ -356,7 +356,7 @@ const saveEvent = async (event) => {
         //await pgClient.connect();
         await checkAndConnectDB();
         let res;
-        oldEvent = getEvent(event.server);
+        let oldEvent = await getEvent(event.server);
         if (oldEvent.id) {
             // UPDATE
             console.log(`Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
