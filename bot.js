@@ -115,25 +115,25 @@ const botCommands = async (message) => {
             // Get any current record for this guild
             //state.event = getEvent(message.guild.name);
             // start dialog in PM
-            await setupState(message.author, message.guild.name);
+            await setupState(message.author, message.channel.guild.name);
 
         } else if (message.content.includes('!list')) {
 
             console.log(`list event `);
-            const event = getGuildEvent(message.guild.name, false); // Don't auto-create
+            const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
             if (event) {
                 console.log(`event ${JSON.stringify(event)}`);
                 sendDM(message.author, formattedEvent(event));
             } else {
                 console.log(`No current event`);
-                sendDM(message.author, `No event is currently set up for ${message.guild.name}. Use the !setup command to set one up.`);
+                sendDM(message.author, `No event is currently set up for ${message.channel.guild.name}. Use the !setup command to set one up.`);
             }
 
         } else if (message.content.includes('!status')) {
 
             console.log(`status request`);
             sendDM(message.author, `Current status: ${state.state}`);
-            const event = getGuildEvent(message.guild.name, false); // Don't auto-create
+            const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
             if (event) {
                 sendDM(message.author, `Event: ${formattedEvent(event)}`);
             }
@@ -285,7 +285,8 @@ const getGuildEvent = async (guild, autoCreate = true) => {
     if (!guildEvents.has(guild)) {
         if (!autoCreate) return;
         guildEvents.set(guild, { 
-            server: guild, user_count: 0 
+            server: guild, 
+            user_count: 0 
         });
     }
     return guildEvents.get(guild);
@@ -334,16 +335,17 @@ const saveEvent = async (event) => {
         //await pgClient.connect();
         await checkAndConnectDB();
         let res;
-        if (event.id) {
+        oldEvent = getEvent(event.server);
+        if (oldEvent.id) {
             // UPDATE
-            console.log(`Updating... ${event.id} to ${JSON.stringify(event)}`);
+            console.log(`Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
             res = await pgClient.query('UPDATE event ' + 
                 'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, user_count=$8 ' + 
                 'WHERE id=$9',
             [event.channel, event.start_time, event.end_time, 
                 event.start_message, event.end_message, 
                 event.response_message, event.reaction, 
-                event.user_count, event.id]);
+                event.user_count, oldEvent.id]);
         } else {
             const uuid = uuidv4();
             console.log(`Inserting... ${uuid} to ${JSON.stringify(event)}`);
