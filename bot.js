@@ -226,9 +226,11 @@ const startEventTimer = (event) => {
     // get seconds until event start
     const eventStart = Date.parse(event.start_time);
     const millisecs = eventStart - (new Date());
-    console.log(`Event starting at ${eventStart}, in ${millisecs/1000} secs`);
-    // set timeout. Call startEvent on timeout
-    state.eventTimer = setTimeout( ev => startEvent(ev), millisecs, event);
+    if (millisecs >=0 ) {
+        console.log(`Event starting at ${eventStart}, in ${millisecs/1000} secs`);
+        // set timeout. Call startEvent on timeout
+        state.eventTimer = setTimeout( ev => startEvent(ev), millisecs, event);
+    }
 }
 
 const startEvent = async (event) => {
@@ -383,6 +385,7 @@ const loadPendingEvents = async () => {
         if (res.rows.length > 0) {
             // start timer for each one. 
             res.rows.forEach(row => {
+                console.log(`Adding to map: ${row.server}`);
                 guildEvents.set(row.server, row);
                 startEventTimer(row);
             });
