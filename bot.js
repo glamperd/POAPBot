@@ -24,6 +24,8 @@ var state = {
     event: {},
 };
 
+var guildEvents = new Map();
+
 const client = new Discord.Client();
 
 const pgClient = new Client({
@@ -74,12 +76,12 @@ const sendDM = async (user, message) => {
 const setupState = async (user, guild) => {
     state.state = states.SETUP;
     state.next = steps.CHANNEL;
-    state.event = getEvent(guild);
+    state.event = getGuildEvent(guild); // Will create one if not already 
     state.dm = await user.createDM();
     state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
     state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
     state.user = user;
-    if (!state.event.id) { state.event.server = guild; }
+    //if (!state.event.id) { state.event.server = guild; }
     resetExpiry();
 }
 
@@ -98,38 +100,50 @@ const handlePublicMessage = async (message) => {
     } else if (message.mentions.has(bot)) {
 
         console.log(`Message mentions me`);
-        if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {// Check that user is an admin in this guild                     
-            if (message.content.includes('!setup') &&
-                state.state !== states.SETUP) {// one at a time
-                console.log(`user has permission`)
-                // Get any current record for this guild
-                //state.event = getEvent(message.guild.name);
-                // start dialog in PM
-                await setupState(message.author, message.guild.name);
-            } else if (message.content.includes('!list')) {
-                console.log(`list event `);
-                const event = await getEvent(message.guild.name);
+        botCommands(message);
+
+    }
+
+}
+
+const botCommands = async (message) => {
+    if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD)) {// Check that user is an admin in this guild                     
+        if (message.content.includes('!setup') &&
+            state.state !== states.SETUP) {// one at a time
+
+            console.log(`user has permission`)
+            // Get any current record for this guild
+            //state.event = getEvent(message.guild.name);
+            // start dialog in PM
+            await setupState(message.author, message.guild.name);
+
+        } else if (message.content.includes('!list')) {
+
+            console.log(`list event `);
+            const event = getGuildEvent(message.guild.name, false); // Don't auto-create
+            if (event) {
                 console.log(`event ${JSON.stringify(event)}`);
-                if (event.id) {
-                    sendDM(message.author, formattedEvent(event));
-                } else {
-                    console.log(`No current event`);
-                    sendDM(message.author, `No event is currently set up for ${message.guild.name}`);
-                }
-            } else if (message.content.includes('!status')) {
-                console.log(`status request`);
-                sendDM(message.author, `Current status: ${state.state}`);
-                const event = await getEvent(message.guild.name);
-                if (event.id) {
-                    sendDM(message.author, `Event: ${formattedEvent(event)}`);
-                }
+                sendDM(message.author, formattedEvent(event));
             } else {
-                message.reply(`Commands are: !setup, !list, !status`);
+                console.log(`No current event`);
+                sendDM(message.author, `No event is currently set up for ${message.guild.name}. Use the !setup command to set one up.`);
             }
+
+        } else if (message.content.includes('!status')) {
+
+            console.log(`status request`);
+            sendDM(message.author, `Current status: ${state.state}`);
+            const event = getGuildEvent(message.guild.name, false); // Don't auto-create
+            if (event) {
+                sendDM(message.author, `Event: ${formattedEvent(event)}`);
+            }
+
         } else {
-            console.log(`user lacks permission, or invalid command`);
-            message.react('❗');
+            message.reply(`Commands are: !setup, !list, !status`);
         }
+    } else {
+        console.log(`user lacks permission, or invalid command`);
+        message.react('❗');
     }
 
 }
@@ -193,7 +207,7 @@ const resetExpiry = () => {
     if (state.expiry) {
         clearTimeout(state.expiry);
         state.expiry = setTimeout( () => {
-            state.dm.send(`Setup expired before answers received. Start again if you wish to comlete setup.`);
+            state.dm.send(`Setup expired before answers received. Start again if you wish to complete setup.`);
             clearSetup();
         }, 300000 );
     }
@@ -214,7 +228,7 @@ const startEventTimer = (event) => {
     const millisecs = eventStart - (new Date());
     console.log(`Event starting at ${eventStart}, in ${millisecs/1000} secs`);
     // set timeout. Call startEvent on timeout
-    state.eventTimer = setTimeout( event => startEvent(event), millisecs, event);
+    state.eventTimer = setTimeout( ev => startEvent(ev), millisecs, event);
 }
 
 const startEvent = async (event) => {
@@ -235,7 +249,7 @@ const endEvent = async (event) => {
     state.state = states.LISTEN;
     // send the event end message
     sendMessageToChannel(event.server, event.channel, event.end_message);
-       
+    updateEventUserCount(event);       
 }
 
 const sendMessageToChannel = async (guildName, channelName, message) => {
@@ -256,11 +270,23 @@ const sendMessageToChannel = async (guildName, channelName, message) => {
 const handleEventMessage = async (message) => {
     // Check whether already responded (Redis)
 
+    let event = getGuildEvent(message.channel.guild.name);
     // Send DM
-    sendDM(message.author, state.event.response_message);
+    sendDM(message.author, event.response_message);
     // Add reaction
-    message.react(state.event.reaction);
-    state.event.user_count ++;
+    message.react(event.reaction);
+
+    event.user_count ++;
+}
+
+const getGuildEvent = async (guild, autoCreate = true) => {
+    if (!guildEvents.has(guild)) {
+        if (!autoCreate) return;
+        guildEvents.set(guild, { 
+            server: guild, user_count: 0 
+        });
+    }
+    return guildEvents.get(guild);
 }
 
 const formattedEvent = (event) => {
@@ -310,21 +336,42 @@ const saveEvent = async (event) => {
             // UPDATE
             console.log(`Updating... ${event.id} to ${JSON.stringify(event)}`);
             res = await pgClient.query('UPDATE event ' + 
-                'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7 ' + 
-                'WHERE id=$8',
-            [event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction, event.id]);
+                'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, user_count=$8 ' + 
+                'WHERE id=$9',
+            [event.channel, event.start_time, event.end_time, 
+                event.start_message, event.end_message, 
+                event.response_message, event.reaction, 
+                event.user_count, event.id]);
         } else {
             const uuid = uuidv4();
             console.log(`Inserting... ${uuid} to ${JSON.stringify(event)}`);
             // INSERT
             res = await pgClient.query('INSERT INTO event ' + 
-                '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction) ' + 
-                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, user_count) ' + 
+                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0)',
             [uuid, event.server, event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction]);
         }
     } catch (err) {
         console.log(`Error saving event: ${err}`);
     } 
+}
+
+const updateEventUserCount = async (event) => {
+    try {
+        //await pgClient.connect();
+        await checkAndConnectDB();
+        let res;
+        if (event.id) {
+            // UPDATE
+            console.log(`Updating user count ... ${event.id} to ${event.user_count}`);
+            res = await pgClient.query('UPDATE event ' + 
+                'SET user_count=$1 ' + 
+                'WHERE id=$2',
+            [event.user_count, event.id]);
+        }
+    } catch (err) {
+        console.log(`Error saving event: ${err}`);
+    }
 }
 
 const loadPendingEvents = async () => {
@@ -336,6 +383,7 @@ const loadPendingEvents = async () => {
         if (res.rows.length > 0) {
             // start timer for each one. 
             res.rows.forEach(row => {
+                guildEvents.set(row.server, row);
                 startEventTimer(row);
             });
         } else {
