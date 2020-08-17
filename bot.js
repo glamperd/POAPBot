@@ -1,6 +1,7 @@
 const Discord = require('discord.js');
 const { Client } = require('pg');
 const redis = require('redis');
+const { promisify } = require('util');
 
 const states = {
     LISTEN: 'listen',
@@ -76,6 +77,9 @@ const sendDM = async (user, message) => {
     dm.send(message);
 }
 
+//-------------------------------
+// Message handling
+
 const handlePublicMessage = async (message) => {
     console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
     const bot = client.user;
@@ -139,20 +143,6 @@ const botCommands = async (message) => {
 
 }
 
-const setupState = async (user, guild) => {
-    console.log(`setupState ${guild}`);
-    state.state = states.SETUP;
-    state.next = steps.CHANNEL;
-    state.event = getGuildEvent(guild); // Will create one if not already 
-    console.log(`created or got event ${JSON.stringify(state.event)}`);
-    state.dm = await user.createDM();
-    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
-    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
-    state.user = user;
-    //if (!state.event.id) { state.event.server = guild; }
-    resetExpiry();
-}
-
 const handleStepAnswer = async (answer) => {
     resetExpiry();
     switch (state.next) {
@@ -208,6 +198,40 @@ const handleStepAnswer = async (answer) => {
     }
 }
 
+const handleEventMessage = async (message) => {
+    let event = getGuildEvent(message.channel.guild.name);
+
+    // Check whether already responded (Redis)
+    const check = await addToSet(event.server, message.author.username);
+    console.log(`Check redis: ${check}`);
+    if (check) {
+
+        // Send DM
+        sendDM(message.author, event.response_message);
+        // Add reaction
+        message.react(event.reaction);
+
+        event.user_count ++;
+    }
+}
+
+//-------------------------------------------
+// Setup 
+
+const setupState = async (user, guild) => {
+    console.log(`setupState ${guild}`);
+    state.state = states.SETUP;
+    state.next = steps.CHANNEL;
+    state.event = getGuildEvent(guild); // Will create one if not already 
+    console.log(`created or got event ${JSON.stringify(state.event)}`);
+    state.dm = await user.createDM();
+    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
+    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
+    state.user = user;
+    //if (!state.event.id) { state.event.server = guild; }
+    resetExpiry();
+}
+
 const resetExpiry = () => {
     if (state.expiry) {
         clearTimeout(state.expiry);
@@ -226,6 +250,9 @@ const clearSetup = () => {
     state.user = undefined;
     state.next = steps.NONE;
 }
+
+// ---------------------------------------------------------------------
+// Event
 
 const eventIsCurrent = (event, channel) => {
     if (!event) return false;
@@ -250,7 +277,7 @@ const startEvent = async (event) => {
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
     // Initialise redis set
-    clearEventSet(event.server);
+    await clearEventSet(event.server);
 
     // Set timer for event end
     const millisecs = getMillisecsUntil(event.end_time);
@@ -283,21 +310,6 @@ const sendMessageToChannel = async (guildName, channelName, message) => {
         return;
     }
     channel.send(message);
-}
-
-const handleEventMessage = async (message) => {
-    let event = getGuildEvent(message.channel.guild.name);
-
-    // Check whether already responded (Redis)
-    if (addToSet(event.server, message.author.username)) {
-
-        // Send DM
-        sendDM(message.author, event.response_message);
-        // Add reaction
-        message.react(event.reaction);
-
-        event.user_count ++;
-    }
 }
 
 const getGuildEvent = (guild, autoCreate = true) => {
@@ -338,6 +350,7 @@ const formattedEvent = (event) => {
 
 }
 
+//-------------------------------------------------------------------------------------------------
 // DB functions
 pgClient.on('end', () => {
     dbConnected = false;
@@ -443,24 +456,41 @@ function uuidv4() {
 //-------------------------------------------------------------------------------------------
 // Redis
 
+const saddAsync = promisify(redisClient.sadd).bind(redisClient);
+const sismemberAsync = promisify(redisClient.sismmember).bind(redisClient);
+const delAsync = promisify(redisClient.del).bind(redisClient);
+
 redisClient.on('connect', () => {
     console.log(`Redis client connected`);
 });
 
 const clearEventSet = async (guild) => {
     // remove any members from the guild's set. Called prior to an event's start.
-    redisClient.del(guild);
+    await delAsync(guild, (err, result) => {
+        console.log(`Set deleted: ${guild} - ${err} -  ${result} keys removed`);
+    });
 }
 
 const isSetMember = async (guild, member) => {
     // returns true if a member (discord user) is already in the event's set 
-    return redisClient.sismember(guild, member);
+    let count = 0;
+    await sismemberAsync(guild, member, (err, result) => {
+        if (err) return 0;
+        count = result;
+    });
+    return count;
 }
 
 const addToSet = async (guild, member) => {
     // adds a user to an event's set
     // returns 0 if already in the set, 1 otherwise
-    return redisClient.sadd(guild, member);
+    let count = 0;
+    await saddAsync(guild, member, (err, result) => {
+        console.log(`Redis SADD error ${err} result ${result}`);
+        if (err) return 0;
+        count = result;
+    });
+    return count;
 } 
 //-------------------------------------------------------------------------------------------
 
