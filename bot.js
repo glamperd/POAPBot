@@ -74,6 +74,7 @@ const sendDM = async (user, message) => {
 }
 
 const setupState = async (user, guild) => {
+    console.log(`setupState ${guild}`);
     state.state = states.SETUP;
     state.next = steps.CHANNEL;
     state.event = getGuildEvent(guild); // Will create one if not already 
@@ -121,7 +122,7 @@ const botCommands = async (message) => {
 
             console.log(`list event `);
             const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
-            if (event) {
+            if (event && event.server) {
                 console.log(`event ${JSON.stringify(event)}`);
                 sendDM(message.author, formattedEvent(event));
             } else {
@@ -225,7 +226,7 @@ const clearSetup = () => {
 const startEventTimer = (event) => {
     // get seconds until event start
     const eventStart = Date.parse(event.start_time);
-    const millisecs = eventStart - (new Date());
+    const millisecs = getMillisecsUntil(eventStart);
     if (millisecs >=0 ) {
         console.log(`Event starting at ${eventStart}, in ${millisecs/1000} secs`);
         // set timeout. Call startEvent on timeout
@@ -240,10 +241,14 @@ const startEvent = async (event) => {
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
     const endTime = Date.parse(event.end_time);
-    const millisecs = endTime - new Date();
+    const millisecs = getMillisecsUntil(endTime);
     console.log(`Event ending in ${millisecs/1000} secs`);
     // Set timer for event end
     state.endEventTimer = setTimeout( ev => endEvent(ev), millisecs, event);
+}
+
+const getMillisecsUntil = (time) => {
+    const millisecs = time - new Date();
 }
 
 const endEvent = async (event) => {
@@ -283,7 +288,7 @@ const handleEventMessage = async (message) => {
 
 const getGuildEvent = async (guild, autoCreate = true) => {
     if (!guildEvents.has(guild)) {
-        if (!autoCreate) return;
+        if (!autoCreate) return false;
         guildEvents.set(guild, { 
             server: guild, 
             user_count: 0 
@@ -293,6 +298,17 @@ const getGuildEvent = async (guild, autoCreate = true) => {
 }
 
 const formattedEvent = (event) => {
+    let ms = getMillisecsUntil(event.start_time);
+    let pending = `EVent will start in ${ms/1000} seconds`;
+    if (ms < 0) {
+        ms = getMillisecsUntil(event.end_time);
+        if (ms < 0) {
+            pending = 'Event finished';
+        } else {    
+            pending = `Event will end in ${ms/1000} seconds`;
+        }
+    }
+
     return `Event in guild: ${event.server}
     Channel: ${event.channel}
     Start: ${event.start_time}
@@ -301,7 +317,9 @@ const formattedEvent = (event) => {
     Event end message: ${event.end_message}
     Response to member messages: ${event.response_message}
     Reaction to awarded messages: ${event.reaction}
-    Members awarded: ${event.user_count}`;
+    Members awarded: ${event.user_count}
+    ${pending}`;
+
 }
 
 // DB functions
