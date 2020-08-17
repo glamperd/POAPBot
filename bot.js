@@ -287,7 +287,7 @@ const handleEventMessage = async (message) => {
     event.user_count ++;
 }
 
-const getGuildEvent = async (guild, autoCreate = true) => {
+const getGuildEvent = (guild, autoCreate = true) => {
     if (!guildEvents.has(guild)) {
         if (!autoCreate) return false;
         guildEvents.set(guild, { 
