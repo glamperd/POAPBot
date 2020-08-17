@@ -86,9 +86,11 @@ const setupState = async (user, guild) => {
 const handlePublicMessage = async (message) => {
     console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
     const bot = client.user;
-    console.log(`bot user ID ${bot.id} ${bot.username}`);
+    //console.log(`bot user ID ${bot.id} ${bot.username}`);
 
-    if (state.state === states.EVENT && state.event.channel === message.channel) {
+    if (state.state === states.EVENT &&
+        state.event.server === message.channel.guild.name && 
+        state.event.channel === message.channel.name) {
 
         // In-event message. Respond with reaction and DM
         handleEventMessage(message);
@@ -259,14 +261,14 @@ const handleEventMessage = async (message) => {
 }
 
 const formattedEvent = (event) => {
-    return `Event in guild: ${event.guild}\n
-    Channel: ${event.channel}\n
-    Start: ${event.start_time}\n
-    End: ${event.end_time}\n
-    Event start message: ${event.start_message}\n
-    Event end message: ${event.end_message}\n
-    Response to member messages: ${event.response_message}\n
-    Reaction to awarded messages: ${event.reaction}\n
+    return `Event in guild: ${event.server}
+    Channel: ${event.channel}
+    Start: ${event.start_time}
+    End: ${event.end_time}
+    Event start message: ${event.start_message}
+    Event end message: ${event.end_message}
+    Response to member messages: ${event.response_message}
+    Reaction to awarded messages: ${event.reaction}
     Members awarded: ${event.user_count}`;
 }
 
