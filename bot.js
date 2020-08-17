@@ -73,19 +73,6 @@ const sendDM = async (user, message) => {
     dm.send(message);
 }
 
-const setupState = async (user, guild) => {
-    console.log(`setupState ${guild}`);
-    state.state = states.SETUP;
-    state.next = steps.CHANNEL;
-    state.event = getGuildEvent(guild); // Will create one if not already 
-    state.dm = await user.createDM();
-    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
-    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
-    state.user = user;
-    //if (!state.event.id) { state.event.server = guild; }
-    resetExpiry();
-}
-
 const handlePublicMessage = async (message) => {
     console.log(`Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`);
     const bot = client.user;
@@ -135,7 +122,7 @@ const botCommands = async (message) => {
             console.log(`status request`);
             sendDM(message.author, `Current status: ${state.state}`);
             const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
-            if (event) {
+            if (event && event.server) {
                 sendDM(message.author, `Event: ${formattedEvent(event)}`);
             }
 
@@ -147,6 +134,20 @@ const botCommands = async (message) => {
         message.react('❗');
     }
 
+}
+
+const setupState = async (user, guild) => {
+    console.log(`setupState ${guild}`);
+    state.state = states.SETUP;
+    state.next = steps.CHANNEL;
+    state.event = getGuildEvent(guild); // Will create one if not already 
+    console.log(`created or got event ${JSON.stringify(state.event)}`);
+    state.dm = await user.createDM();
+    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
+    state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
+    state.user = user;
+    //if (!state.event.id) { state.event.server = guild; }
+    resetExpiry();
 }
 
 const handleStepAnswer = async (answer) => {
@@ -298,8 +299,10 @@ const getGuildEvent = async (guild, autoCreate = true) => {
 }
 
 const formattedEvent = (event) => {
+    if (!event || !event.server) return '';
+
     let ms = getMillisecsUntil(event.start_time);
-    let pending = `EVent will start in ${ms/1000} seconds`;
+    let pending = `Event will start in ${ms/1000} seconds`;
     if (ms < 0) {
         ms = getMillisecsUntil(event.end_time);
         if (ms < 0) {
