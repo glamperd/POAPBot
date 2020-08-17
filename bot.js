@@ -226,10 +226,9 @@ const clearSetup = () => {
 
 const startEventTimer = (event) => {
     // get seconds until event start
-    const eventStart = Date.parse(event.start_time);
-    const millisecs = getMillisecsUntil(eventStart);
-    if (millisecs >=0 ) {
-        console.log(`Event starting at ${eventStart}, in ${millisecs/1000} secs`);
+    const millisecs = getMillisecsUntil(event.start_time);
+    if (millisecs >= 0) {
+        console.log(`Event starting at ${event.start_time}, in ${millisecs/1000} secs`);
         // set timeout. Call startEvent on timeout
         state.eventTimer = setTimeout( ev => startEvent(ev), millisecs, event);
     }
@@ -241,15 +240,14 @@ const startEvent = async (event) => {
     // Send the start message to the channel
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
-    const endTime = Date.parse(event.end_time);
-    const millisecs = getMillisecsUntil(endTime);
+    const millisecs = getMillisecsUntil(event.end_time);
     console.log(`Event ending in ${millisecs/1000} secs`);
     // Set timer for event end
     state.endEventTimer = setTimeout( ev => endEvent(ev), millisecs, event);
 }
 
 const getMillisecsUntil = (time) => {
-    const millisecs = time - new Date();
+    const millisecs = Date.parse(time) - new Date();
 }
 
 const endEvent = async (event) => {
