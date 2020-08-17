@@ -87,15 +87,15 @@ const handlePublicMessage = async (message) => {
 
     const event = getGuildEvent(message.channel.guild.name);
 
-    if (eventIsCurrent(event, message.channel.name)) {
-
-        // In-event message. Respond with reaction and DM
-        handleEventMessage(message);
-
-    } else if (message.mentions.has(bot)) {
+    if (message.mentions.has(bot)) {
 
         console.log(`Message mentions me`);
         botCommands(message);
+
+    } else if (eventIsCurrent(event, message.channel.name)) {
+
+        // In-event message. Respond with reaction and DM
+        handleEventMessage(message);
 
     }
 
@@ -485,11 +485,12 @@ const addToSet = async (guild, member) => {
     // adds a user to an event's set
     // returns 0 if already in the set, 1 otherwise
     let count = 0;
-    await saddAsync(guild, member, (err, result) => {
-        console.log(`Redis SADD error ${err} result ${result}`);
+    let c = await saddAsync(guild, member, (err, result) => {
+        console.log(`Redis SADD -  error ${err} result ${result}`);
         if (err) return 0;
         count = result;
     });
+    console.log(`addToSet ${c} ${count}`);
     return count;
 } 
 //-------------------------------------------------------------------------------------------
