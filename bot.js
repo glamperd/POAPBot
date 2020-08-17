@@ -138,6 +138,7 @@ const handleStepAnswer = async (answer) => {
     resetExpiry();
     switch (state.next) {
         case steps.CHANNEL: {
+            console.log(`step answer ${state.event.id}`);
             if (answer.startsWith('#')) answer = answer.substring(1);
             state.event.channel = answer; // TODO - confirm that guild has this channel
             state.next = steps.START;
@@ -199,6 +200,7 @@ const resetExpiry = () => {
 }
 
 const clearSetup = () => {
+    console.log(`Clearing setup. Event in ${state.event.server} `);
     state.state = states.LISTEN;
     state.dm = undefined;
     state.event = {};
@@ -258,6 +260,7 @@ const handleEventMessage = async (message) => {
     sendDM(message.author, state.event.response_message);
     // Add reaction
     message.react(state.event.reaction);
+    state.event.user_count ++;
 }
 
 const formattedEvent = (event) => {
