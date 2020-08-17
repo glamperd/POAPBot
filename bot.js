@@ -1,5 +1,6 @@
 const Discord = require('discord.js');
-const { Client } = require('pg')
+const { Client } = require('pg');
+const redis = require('redis');
 
 const states = {
     LISTEN: 'listen',
@@ -36,6 +37,8 @@ const pgClient = new Client({
     port: process.env.DB_PORT,
 });
 var dbConnected = false;
+
+const redisClient = redis.createClient(process.env.REDIS_URL);
 
 client.on('ready', () => {
     console.log('Discord client ready!');
@@ -242,13 +245,16 @@ const startEventTimer = (event) => {
 
 const startEvent = async (event) => {
     console.log(`event started: ${JSON.stringify(event)}`);
-    state.state = states.EVENT;
+    //state.state = states.EVENT;
     // Send the start message to the channel
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
+    // Initialise redis set
+    clearEventSet(event.server);
+
+    // Set timer for event end
     const millisecs = getMillisecsUntil(event.end_time);
     console.log(`Event ending in ${millisecs/1000} secs`);
-    // Set timer for event end
     state.endEventTimer = setTimeout( ev => endEvent(ev), millisecs, event);
 }
 
@@ -280,15 +286,18 @@ const sendMessageToChannel = async (guildName, channelName, message) => {
 }
 
 const handleEventMessage = async (message) => {
-    // Check whether already responded (Redis)
-
     let event = getGuildEvent(message.channel.guild.name);
-    // Send DM
-    sendDM(message.author, event.response_message);
-    // Add reaction
-    message.react(event.reaction);
 
-    event.user_count ++;
+    // Check whether already responded (Redis)
+    if (addToSet(event.server, message.author.username)) {
+
+        // Send DM
+        sendDM(message.author, event.response_message);
+        // Add reaction
+        message.react(event.reaction);
+
+        event.user_count ++;
+    }
 }
 
 const getGuildEvent = (guild, autoCreate = true) => {
@@ -431,5 +440,30 @@ function uuidv4() {
     });
 }
 
+//-------------------------------------------------------------------------------------------
+// Redis
+
+redisClient.on('connect', () => {
+    console.log(`Redis client connected`);
+});
+
+const clearEventSet = async (guild) => {
+    // remove any members from the guild's set. Called prior to an event's start.
+    redisClient.del(guild);
+}
+
+const isSetMember = async (guild, member) => {
+    // returns true if a member (discord user) is already in the event's set 
+    return redisClient.sismember(guild, member);
+}
+
+const addToSet = async (guild, member) => {
+    // adds a user to an event's set
+    // returns 0 if already in the set, 1 otherwise
+    return redisClient.sadd(guild, member);
+} 
+//-------------------------------------------------------------------------------------------
+
 // THIS  MUST  BE  THIS  WAY
 client.login(process.env.BOT_TOKEN);
+
