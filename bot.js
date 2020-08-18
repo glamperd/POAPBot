@@ -148,43 +148,56 @@ const handleStepAnswer = async (answer) => {
     switch (state.next) {
         case steps.CHANNEL: {
             console.log(`step answer ${state.event.id}`);
+            if (answer === '-') answer = state.event.channel;
             if (answer.startsWith('#')) answer = answer.substring(1);
-            state.event.channel = answer; // TODO - confirm that guild has this channel
-            state.next = steps.START;
-            state.dm.send(`Date and time to start? ${state.event.start_time || ''}`);
+            // Confirm that channel exists
+            const chan = await getChannel(state.event.server, answer);
+            if (!chan) {
+                state.dm.send(`I can't find a channel named ${answer}. Try again? ${state.event.channel || ''}`);
+            } else {
+                state.event.channel = answer;
+                state.next = steps.START;
+                state.dm.send(`Date and time to start? ${state.event.start_time || ''}`);
+            }
             break;
         }
         case steps.START: {
+            if (answer === '-') answer = state.event.start_time;
             state.event.start_time = answer;
             state.next = steps.END;
             state.dm.send(`Date and time to end the event? (${state.event.end_time || ''})`);
             break;
         }
         case steps.END: {
+            if (answer === '-') answer = state.event.end_time;
             state.event.end_time = answer;
             state.next = steps.START_MSG;
             state.dm.send(`Message to publish at the start of the event? (${state.event.start_message || 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.'})`);
             break;
         }
         case steps.START_MSG: {
+            if (answer === '-') answer = state.event.start_message;
             state.event.start_message = answer;
             state.next = steps.END_MSG;
             state.dm.send(`Message to publish to end the event? (${state.event.end_message || 'The POAP distribution event has ended.' })`);
             break;
         }
         case steps.END_MSG: {
+            if (answer === '-') answer = state.event.end_message;
             state.event.end_message = answer;
             state.next = steps.RESPONSE;
             state.dm.send(`Response to send privately to members during the event? (${state.event.response_message || ''})`);
             break;
         }
         case steps.RESPONSE: {
+            if (answer === '-') answer = state.event.response_message;
             state.event.response_message = answer;
             state.next = steps.REACTION;
             state.dm.send(`Reaction to public message by channel members during the event? (${state.event.reaction || ':thumbsup:'})`);
             break;
         }
         case steps.REACTION: {
+            if (answer === '-') answer = state.event.reaction;
             state.event.reaction = answer;
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
@@ -272,7 +285,7 @@ const startEventTimer = (event) => {
 
 const startEvent = async (event) => {
     console.log(`event started: ${JSON.stringify(event)}`);
-    //state.state = states.EVENT;
+    event.user_count = 0;
     // Send the start message to the channel
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
@@ -295,32 +308,6 @@ const endEvent = async (event) => {
     // send the event end message
     sendMessageToChannel(event.server, event.channel, event.end_message);
     updateEventUserCount(event);
-}
-
-const sendMessageToChannel = async (guildName, channelName, message) => {
-    console.log(`sendMessageToChannel ${guildName} ${channelName} msg ${message}`);
-    const guild = client.guilds.cache.find(guild => (guild.name === guildName));
-    if (!guild) {
-        console.log(`Guild not found! Client guilds: ${client.guilds.cache}`);
-        return;
-    }
-    const channel = guild.channels.cache.find(channel => (channel.name === channelName));
-    if (!channel) {
-        console.log(`Channel not found! Guild channels: ${guild.channels.cache.size}`);
-        return;
-    }
-    channel.send(message);
-}
-
-const getGuildEvent = (guild, autoCreate = true) => {
-    if (!guildEvents.has(guild)) {
-        if (!autoCreate) return false;
-        guildEvents.set(guild, { 
-            server: guild, 
-            user_count: 0 
-        });
-    }
-    return guildEvents.get(guild);
 }
 
 const formattedEvent = (event) => {
@@ -348,6 +335,43 @@ const formattedEvent = (event) => {
     Members awarded: ${event.user_count}
     ${pending}`;
 
+}
+
+const getGuildEvent = (guild, autoCreate = true) => {
+    if (!guildEvents.has(guild)) {
+        if (!autoCreate) return false;
+        guildEvents.set(guild, { 
+            server: guild, 
+            user_count: 0 
+        });
+    }
+    return guildEvents.get(guild);
+}
+
+//-----------------------------------------------
+// Discord functions
+
+const sendMessageToChannel = async (guildName, channelName, message) => {
+    console.log(`sendMessageToChannel ${guildName} ${channelName} msg ${message}`);
+    const channel = getChannel(guildName, channelName);
+    if (!channel) {
+        return;
+    }
+    await channel.send(message);
+}
+
+const getChannel = (guildName, channelName) => {
+    const guild = client.guilds.cache.find(guild => (guild.name === guildName));
+    if (!guild) {
+        console.log(`Guild not found! Client guilds: ${client.guilds.cache}`);
+        return false;
+    }
+    const channel = guild.channels.cache.find(chan => (chan.name === channelName));
+    if (!channel) {
+        console.log(`Channel not found! Guild channels: ${guild.channels.cache.size}`);
+        return false;
+    }
+    return channel;
 }
 
 //-------------------------------------------------------------------------------------------------
