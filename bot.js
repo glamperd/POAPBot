@@ -245,7 +245,8 @@ const setupState = async (user, guild) => {
     state.event = getGuildEvent(guild); // Will create one if not already 
     console.log(`created or got event ${JSON.stringify(state.event)}`);
     state.dm = await user.createDM();
-    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time:`);
+    state.dm.send(`Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time.`);
+    state.dm.send(`To accept the suggested value, respond with "-"`);
     state.dm.send(`First: which channel do you want me to listen to? (${state.event.channel || ''})`);
     state.user = user;
     //if (!state.event.id) { state.event.server = guild; }
