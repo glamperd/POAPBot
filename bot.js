@@ -18,6 +18,12 @@ const steps = {
     RESPONSE: 'response',
     REACTION: 'reaction',
 };
+
+const defaultStartMessage = 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.';
+const defaultEndMessage = 'The POAP distribution event has ended.';
+const defaultResponseMessage = 'Here is a link where you can claim your POAP token. Thanks for participating in the event. ';
+const defaultReaction = ':medal:';
+
 var state = {
     state: states.LISTEN,
     expiry: 0,
@@ -25,6 +31,7 @@ var state = {
     next: steps.NONE,
     event: {},
 };
+
 
 var guildEvents = new Map();
 
@@ -172,32 +179,32 @@ const handleStepAnswer = async (answer) => {
             if (answer === '-') answer = state.event.end_time;
             state.event.end_time = answer;
             state.next = steps.START_MSG;
-            state.dm.send(`Message to publish at the start of the event? (${state.event.start_message || 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.'})`);
+            state.dm.send(`Message to publish at the start of the event? (${state.event.start_message || defaultStartMessage})`);
             break;
         }
         case steps.START_MSG: {
-            if (answer === '-') answer = state.event.start_message;
+            if (answer === '-') answer = state.event.start_message || defaultStartMessage;
             state.event.start_message = answer;
             state.next = steps.END_MSG;
-            state.dm.send(`Message to publish to end the event? (${state.event.end_message || 'The POAP distribution event has ended.' })`);
+            state.dm.send(`Message to publish to end the event? (${state.event.end_message || defaultEndMessage })`);
             break;
         }
         case steps.END_MSG: {
-            if (answer === '-') answer = state.event.end_message;
+            if (answer === '-') answer = state.event.end_message || defaultEndMessage;
             state.event.end_message = answer;
             state.next = steps.RESPONSE;
-            state.dm.send(`Response to send privately to members during the event? (${state.event.response_message || ''})`);
+            state.dm.send(`Response to send privately to members during the event? (${state.event.response_message || defaultResponseMessage})`);
             break;
         }
         case steps.RESPONSE: {
-            if (answer === '-') answer = state.event.response_message;
+            if (answer === '-') answer = state.event.response_message || defaultResponseMessage;
             state.event.response_message = answer;
             state.next = steps.REACTION;
-            state.dm.send(`Reaction to public message by channel members during the event? (${state.event.reaction || ':thumbsup:'})`);
+            state.dm.send(`Reaction to public message by channel members during the event? (${state.event.reaction || defaultReaction})`);
             break;
         }
         case steps.REACTION: {
-            if (answer === '-') answer = state.event.reaction;
+            if (answer === '-') answer = state.event.reaction || defaultReaction;
             state.event.reaction = answer;
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
