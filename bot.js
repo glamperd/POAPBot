@@ -153,7 +153,7 @@ const botCommands = async (message) => {
 
 const handleStepAnswer = async (message) => {
     resetExpiry();
-    let answer = message.answer;
+    let answer = message.content;
     switch (state.next) {
         case steps.CHANNEL: {
             console.log(`step answer ${state.event.id}`);
