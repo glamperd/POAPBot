@@ -253,7 +253,7 @@ const handleEventMessage = async (message) => {
 
 const readFile = async (url) => {
     try {
-        const res = await axios.get(ma.url);
+        const res = await axios.get(url);
         console.log(`File data: ${res.data}`);
     } catch (err) {
         console.log(`Error reading file: ${err}`);
