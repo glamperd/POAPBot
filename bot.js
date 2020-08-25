@@ -218,7 +218,7 @@ const handleStepAnswer = async (message) => {
                 state.dm.send(`No file attachment found!`);
             } else {
                 const ma = message.attachments.first;
-                console.log(`File ${ma.name} is attached`);
+                console.log(`File ${ma.name} ${ma.url} ${ma.id} is attached`);
             }
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
