@@ -17,6 +17,7 @@ const steps = {
     END_MSG: 'end_msg',
     RESPONSE: 'response',
     REACTION: 'reaction',
+    FILE: 'file',
 };
 
 const defaultStartMessage = 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.';
@@ -71,7 +72,7 @@ client.on('message', async message => {
             console.log(`state ${state.state} user ${state.user ? state.user.id : '-'}`);
             if (state.state === states.SETUP && 
                 state.user.id === message.author.id) {
-                handleStepAnswer(message.content);
+                handleStepAnswer(message);
             }
         } else {
             handlePublicMessage(message);
@@ -150,8 +151,9 @@ const botCommands = async (message) => {
 
 }
 
-const handleStepAnswer = async (answer) => {
+const handleStepAnswer = async (message) => {
     resetExpiry();
+    let answer = message.answer;
     switch (state.next) {
         case steps.CHANNEL: {
             console.log(`step answer ${state.event.id}`);
@@ -206,6 +208,18 @@ const handleStepAnswer = async (answer) => {
         case steps.REACTION: {
             if (answer === '-') answer = state.event.reaction || defaultReaction;
             state.event.reaction = answer;
+            state.next = steps.FILE;
+            state.dm.send(`Please attach a CSV file containing tokens`);
+            break;
+        }
+        case steps.FILE: {
+            state.event.file_message = message.id;
+            if (message.attachments.size <= 0) {
+                state.dm.send(`No file attachment found!`);
+            } else {
+                const ma = message.attachments.first;
+                console.log(`File ${ma.name} is attached`);
+            }
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
             clearTimeout(state.expiry);
