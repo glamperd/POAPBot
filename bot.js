@@ -2,6 +2,7 @@ const Discord = require('discord.js');
 const { Client } = require('pg');
 const redis = require('redis');
 const { promisify } = require('util');
+const axios = require('axios');
 
 const states = {
     LISTEN: 'listen',
@@ -213,12 +214,13 @@ const handleStepAnswer = async (message) => {
             break;
         }
         case steps.FILE: {
-            state.event.file_message = message.id;
             if (message.attachments.size <= 0) {
                 state.dm.send(`No file attachment found!`);
             } else {
                 const ma = message.attachments.first();
                 console.log(`File ${ma.name} ${ma.url} ${ma.id} is attached`);
+                state.event.file_url = ma.url;
+                await readFile(ma.url)
             }
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
@@ -246,6 +248,15 @@ const handleEventMessage = async (message) => {
         message.react(event.reaction);
 
         event.user_count ++;
+    }
+}
+
+const readFile = async (url) => {
+    try {
+        const res = await axios.get(ma.url);
+        console.log(`File data: ${res.data}`);
+    } catch (err) {
+        console.log(`Error reading file: ${err}`);
     }
 }
 
