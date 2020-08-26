@@ -127,7 +127,7 @@ const botCommands = async (message) => {
             const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
             if (event && event.server) {
                 console.log(`event ${JSON.stringify(event)}`);
-                sendDM(message.author, formattedEvent(event));
+                sendDM(message.author, await formattedEvent(event));
             } else {
                 console.log(`No current event`);
                 sendDM(message.author, `No event is currently set up for ${message.channel.guild.name}. Use the !setup command to set one up.`);
@@ -139,7 +139,7 @@ const botCommands = async (message) => {
             sendDM(message.author, `Current status: ${state.state}`);
             const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
             if (event && event.server) {
-                sendDM(message.author, `Event: ${formattedEvent(event)}`);
+                sendDM(message.author, `Event: ${await formattedEvent(event)}`);
             }
 
         } else {
@@ -220,7 +220,9 @@ const handleStepAnswer = async (message) => {
                 const ma = message.attachments.first();
                 console.log(`File ${ma.name} ${ma.url} ${ma.id} is attached`);
                 state.event.file_url = ma.url;
-                await readFile(ma.url)
+                await readFile(ma.url, state.event.server);
+                // Report number of codes added
+                state.dm.send(`${await setSize(state.event.server + '#codes')} codes added`);
             }
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
@@ -251,18 +253,10 @@ const handleEventMessage = async (message) => {
     }
 }
 
-const readFile = async (url) => {
-    try {
-        const res = await axios.get(url);
-        console.log(`File data: ${res.data}`);
-    } catch (err) {
-        console.log(`Error reading file: ${err}`);
-    }
-}
-
 //-------------------------------------------
 // Setup 
 
+// Initialise the state for a setup dialog
 const setupState = async (user, guild) => {
     console.log(`setupState ${guild}`);
     state.state = states.SETUP;
@@ -343,7 +337,7 @@ const endEvent = async (event) => {
     updateEventUserCount(event);
 }
 
-const formattedEvent = (event) => {
+const formattedEvent = async (event) => {
     if (!event || !event.server) return '';
 
     let ms = getMillisecsUntil(event.start_time);
@@ -365,6 +359,8 @@ const formattedEvent = (event) => {
     Event end message: ${event.end_message}
     Response to member messages: ${event.response_message}
     Reaction to awarded messages: ${event.reaction}
+    Data url: ${event.file_url}
+    Codes available: ${await setSize(event.server + '#codes')}
     Members awarded: ${event.user_count}
     ${pending}`;
 
@@ -407,6 +403,20 @@ const getChannel = (guildName, channelName) => {
     return channel;
 }
 
+const readFile = async (url, guild) => {
+    try {
+        const res = await axios.get(url);
+        console.log(`File data: ${res.data}`);
+        const setName = guild + '#codes';
+        res.data.split('\n').forEach((val) => {
+            // Add to redis set
+            addToSet(setName, val);
+        });
+    } catch (err) {
+        console.log(`Error reading file: ${err}`);
+    }
+}
+
 //-------------------------------------------------------------------------------------------------
 // DB functions
 pgClient.on('end', () => {
@@ -444,20 +454,20 @@ const saveEvent = async (event) => {
             // UPDATE
             console.log(`Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
             res = await pgClient.query('UPDATE event ' + 
-                'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, user_count=$8 ' + 
-                'WHERE id=$9',
+                'SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, user_count=$8, file_url=$9 ' + 
+                'WHERE id=$10',
             [event.channel, event.start_time, event.end_time, 
                 event.start_message, event.end_message, 
                 event.response_message, event.reaction, 
-                event.user_count, oldEvent.id]);
+                event.user_count, event.file_url, oldEvent.id]);
         } else {
             const uuid = uuidv4();
             console.log(`Inserting... ${uuid} to ${JSON.stringify(event)}`);
             // INSERT
             res = await pgClient.query('INSERT INTO event ' + 
-                '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, user_count) ' + 
-                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0)',
-            [uuid, event.server, event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction]);
+                '(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, user_count, file_url) ' + 
+                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10)',
+            [uuid, event.server, event.channel, event.start_time, event.end_time, event.start_message, event.end_message, event.response_message, event.reaction, event.file_url]);
         }
     } catch (err) {
         console.log(`Error saving event: ${err}`);
@@ -516,6 +526,7 @@ function uuidv4() {
 const saddAsync = promisify(redisClient.sadd).bind(redisClient);
 //const sismemberAsync = promisify(redisClient.sismember).bind(redisClient);
 const delAsync = promisify(redisClient.del).bind(redisClient);
+const scardAsync = promisify(redisClient.scard).bind(redisClient);
 
 redisClient.on('connect', () => {
     console.log(`Redis client connected`);
@@ -551,6 +562,11 @@ const addToSet = async (guild, member) => {
     console.log(`addToSet ${c}`);
     return c;
 } 
+
+const setSize = async (setName) => {
+    return scardAsync(setName);
+}
+
 //-------------------------------------------------------------------------------------------
 
 // THIS  MUST  BE  THIS  WAY
