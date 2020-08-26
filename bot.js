@@ -245,7 +245,7 @@ const handleEventMessage = async (message) => {
     console.log(`Check redis: ${check}`);
     if (check) {
         // Get code
-        const code = popFromSet(event.server + codeSet);
+        const code = await popFromSet(event.server + codeSet);
         console.log(`Code found: ${code}`);
 
         // replace placeholder in message
