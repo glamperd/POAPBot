@@ -23,8 +23,9 @@ const steps = {
 
 const defaultStartMessage = 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.';
 const defaultEndMessage = 'The POAP distribution event has ended.';
-const defaultResponseMessage = 'Here is a link where you can claim your POAP token. Thanks for participating in the event. ';
+const defaultResponseMessage = 'Here is a link where you can claim your POAP token: http://poap.xyz/{code} Thanks for participating in the event. ';
 const defaultReaction = ':medal:';
+const codeSet = '#codes';
 
 var state = {
     state: states.LISTEN,
@@ -222,7 +223,7 @@ const handleStepAnswer = async (message) => {
                 state.event.file_url = ma.url;
                 await readFile(ma.url, state.event.server);
                 // Report number of codes added
-                state.dm.send(`${await setSize(state.event.server + '#codes')} codes added`);
+                state.dm.send(`${await setSize(state.event.server + codeSet)} codes added`);
             }
             state.next = steps.NONE;
             state.dm.send(`Thank you. That's everything. I'll start the event at the appointed time.`);
@@ -243,13 +244,22 @@ const handleEventMessage = async (message) => {
     const check = await addToSet(event.server, message.author.username);
     console.log(`Check redis: ${check}`);
     if (check) {
+        // Get code
+        const code = popFromSet(event.server + codeSet);
+        console.log(`Code found: ${code}`);
+
+        // replace placeholder in message
+        const newMsg = event.response_message.replace('{code}', code);
 
         // Send DM
-        sendDM(message.author, event.response_message);
+        sendDM(message.author, newMsg);
         // Add reaction
         message.react(event.reaction);
 
         event.user_count ++;
+
+        // Add to used codes map
+
     }
 }
 
@@ -360,7 +370,7 @@ const formattedEvent = async (event) => {
     Response to member messages: ${event.response_message}
     Reaction to awarded messages: ${event.reaction}
     Data url: ${event.file_url}
-    Codes available: ${await setSize(event.server + '#codes')}
+    Codes available: ${await setSize(event.server + codeSet)}
     Members awarded: ${event.user_count}
     ${pending}`;
 
@@ -407,8 +417,9 @@ const readFile = async (url, guild) => {
     try {
         const res = await axios.get(url);
         console.log(`File data: ${res.data}`);
-        const setName = guild + '#codes';
+        const setName = guild + codeSet;
         res.data.split('\n').forEach((val) => {
+            console.log(`code ${val}`);
             // Add to redis set
             addToSet(setName, val);
         });
@@ -527,6 +538,7 @@ const saddAsync = promisify(redisClient.sadd).bind(redisClient);
 //const sismemberAsync = promisify(redisClient.sismember).bind(redisClient);
 const delAsync = promisify(redisClient.del).bind(redisClient);
 const scardAsync = promisify(redisClient.scard).bind(redisClient);
+const spopAsync = promisify(redisClient.spop).bind(redisClient);
 
 redisClient.on('connect', () => {
     console.log(`Redis client connected`);
@@ -565,6 +577,10 @@ const addToSet = async (guild, member) => {
 
 const setSize = async (setName) => {
     return scardAsync(setName);
+}
+
+const popFromSet = async (setName) => {
+    return spopAsync(setName);
 }
 
 //-------------------------------------------------------------------------------------------
