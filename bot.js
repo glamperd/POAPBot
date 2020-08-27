@@ -421,7 +421,9 @@ const readFile = async (url, guild) => {
         res.data.split('\n').forEach((val) => {
             console.log(`code ${val}`);
             // Add to redis set
-            addToSet(setName, val);
+            if (val.length > 0) {
+                addToSet(setName, val);
+            }
         });
     } catch (err) {
         console.log(`Error reading file: ${err}`);
