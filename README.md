@@ -57,8 +57,7 @@ Codes will be issued to participants during an event in the direct message from 
 
 Codes will be chosen at random from the list when a participant's message is received. As noted above, a user will only receive the response a single time, so they will only receive one code. Codes must be unique. If a duplicate code is included, it will be ignored. 
 
-The bot will report the number of codes available when a file is uploaded. The number of codes reported is the count of unique codes available at that time. The same count is reported in the response to a *!status* or *!list* command. The count will reduce as an event proceeds, always reflecting the number of remaining available codes. 
-
+The bot will report the number of codes available when a file is uploaded. The number of codes reported is the count of unique codes available at that time to the next event for that guild. The same count is reported in the response to a *!status* or *!list* command. The count will reduce as an event proceeds, always reflecting the number of remaining available codes. 
 
 ### Data stores
 Event data is stored in a PostgreSQL database, and will be preserved indefinitely. Members participating in an event will be tracked in a Redis data store. This enables the bot to avoid responding more than once to a member. The Redis data store is not persistent, and will eventually be cleared. In any case, the store will be cleared at the start of an event. 
