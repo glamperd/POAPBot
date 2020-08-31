@@ -32,7 +32,7 @@ The available commands are:
 - *!status* Will show the above, and also an indication of the bot's current status.
 - *!setup* Will initiate a dialog to set up a POAP event. Use this to add or modify an event.
 
-Note that the command must be issued in one of the guild's text channels, but the bot will respond in a direct message dialog with the requesting user. The bot will only refer to events added in the same guild as that in which the command is issued. This mechanism ensures that there is no confusion with other guilds, and that the user has admin privileges in tyhat particular guild, since both the bot and the user may be a member of multiple guilds. 
+Note that the command must be issued in one of the guild's text channels, but the bot will respond in a direct message dialog with the requesting user. The bot will only refer to events added in the same guild as that in which the command is issued. This mechanism ensures that there is no confusion with other guilds, and that the user has admin privileges in that particular guild, since both the bot and the user may be a member of multiple guilds. 
 
 The specific admin privilege required to issue bot commands is _Manage Channels_.
 
@@ -40,7 +40,8 @@ The specific admin privilege required to issue bot commands is _Manage Channels_
 Some aspects of a POAP distribution event are customisable, specifically:
 - the messages issued publicly and privately by the bot during the event.
 - the reaction icon
-- the start and end times.
+- the start and end times
+- a file containing codes to be issued to participants
 
 The bot will collect these parameters in a private dialog in response to the *!setup* command.
 
@@ -49,5 +50,17 @@ Start and end dates should be entered as a date-time string in the UTC +0 time z
 
 The bot will offer a default value for each parameter. If an event is being modified, the default value will be the event's current value. To select the default value, respond with a `-` (hyphen) character.
 
+### Codes
+The *!setup* dialog will request a set of codes. The expected format is a text file containing 1 code per line. 
+
+Codes will be issued to participants during an event in the direct message from the bot. The code will be inserted to replace the placeholder - `{code}` - in the _response message_. 
+
+Codes will be chosen at random from the list when a participant's message is received. As noted above, a user will only receive the response a single time, so they will only receive one code. Codes must be unique. If a duplicate code is included, it will be ignored. 
+
+The bot will report the number of codes available when a file is uploaded. The number of codes reported is the count of unique codes available at that time. The same count is reported in the response to a *!status* or *!list* command. The count will reduce as an event proceeds, always reflecting the number of remaining available codes. 
+
+
 ### Data stores
 Event data is stored in a PostgreSQL database, and will be preserved indefinitely. Members participating in an event will be tracked in a Redis data store. This enables the bot to avoid responding more than once to a member. The Redis data store is not persistent, and will eventually be cleared. In any case, the store will be cleared at the start of an event. 
+
+Codes are stored in Redis, with a unique set for each guild. The set will be lost in the event that Redis is shut down, and reloaded from file if the bot is shut down and restarted. This must not happen while an event is in progress, or codes will be re-loaded from the file and possibly re-used.
