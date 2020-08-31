@@ -517,7 +517,7 @@ const loadPendingEvents = async () => {
                 console.log(`Adding to map: ${row.server}`);
                 guildEvents.set(row.server, row);
                 if (row.file_url) {
-                    readFile(row.server, row.file_url);
+                    readFile(row.file_url, row.server);
                 }
                 startEventTimer(row);
             });
