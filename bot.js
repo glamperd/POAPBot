@@ -258,7 +258,7 @@ const handleEventMessage = async (message) => {
 
         event.user_count ++;
 
-        // Add to used codes map
+        // TODO ?? Add to used codes map ??
 
     }
 }
@@ -516,6 +516,9 @@ const loadPendingEvents = async () => {
             res.rows.forEach(row => {
                 console.log(`Adding to map: ${row.server}`);
                 guildEvents.set(row.server, row);
+                if (row.file_url) {
+                    readFile(row.server, row.file_url);
+                }
                 startEventTimer(row);
             });
         } else {
