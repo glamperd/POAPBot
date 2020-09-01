@@ -24,7 +24,7 @@ const steps = {
 const defaultStartMessage = 'The POAP distribution event is now active. Post a message in this channel to earn your POAP token.';
 const defaultEndMessage = 'The POAP distribution event has ended.';
 const defaultResponseMessage = 'Here is a link where you can claim your POAP token: http://poap.xyz/{code} Thanks for participating in the event. ';
-const defaultReaction = ':medal:';
+const defaultReaction = '🏅';
 const codeSet = '#codes';
 
 var state = {
@@ -210,8 +210,8 @@ const handleStepAnswer = async (message) => {
         case steps.REACTION: {
             if (answer === '-') answer = state.event.reaction || defaultReaction;
             state.event.reaction = answer;
-            const emoji = getEmoji(state.event.server, answer);
-            await message.react(emoji);
+            //const emoji = getEmoji(state.event.server, answer);
+            await message.react(answer);
             state.next = steps.FILE;
             state.dm.send(`Please attach a CSV file containing tokens`);
             break;
@@ -256,7 +256,7 @@ const handleEventMessage = async (message) => {
         // Send DM
         sendDM(message.author, newMsg);
         // Add reaction
-        await message.react(event.reaction_emoji);
+        await message.react(event.reaction);
 
         event.user_count ++;
 
@@ -329,7 +329,7 @@ const startEvent = async (event) => {
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
     // Set reaction emoji
-    event.reaction_emoji = getemoji(event.server, event.reaction);
+    //event.reaction_emoji = getemoji(event.server, event.reaction);
 
     // Initialise redis set
     await clearEventSet(event.server);
