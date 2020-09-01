@@ -211,6 +211,7 @@ const handleStepAnswer = async (message) => {
             if (answer === '-') answer = state.event.reaction || defaultReaction;
             state.event.reaction = answer;
             //const emoji = getEmoji(state.event.server, answer);
+            console.log(`reacting with ${answer}`);
             await message.react(answer);
             state.next = steps.FILE;
             state.dm.send(`Please attach a CSV file containing tokens`);
