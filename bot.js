@@ -254,7 +254,7 @@ const handleEventMessage = async (message) => {
         // Send DM
         sendDM(message.author, newMsg);
         // Add reaction
-        message.react(event.reaction);
+        message.react(event.reaction_emoji);
 
         event.user_count ++;
 
@@ -325,6 +325,12 @@ const startEvent = async (event) => {
     event.user_count = 0;
     // Send the start message to the channel
     sendMessageToChannel(event.server, event.channel, event.start_message);
+
+    // Set reaction emoji
+    const guild = getGuild(event.server);
+    if (guild) {
+        event.reaction_emoji = guild.emojis.cache.find(emoji => emoji.name === event.reaction);
+    }
 
     // Initialise redis set
     await clearEventSet(event.server);
@@ -400,9 +406,8 @@ const sendMessageToChannel = async (guildName, channelName, message) => {
 }
 
 const getChannel = (guildName, channelName) => {
-    const guild = client.guilds.cache.find(guild => (guild.name === guildName));
+    const guild = getGuild(guildName);
     if (!guild) {
-        console.log(`Guild not found! Client guilds: ${client.guilds.cache}`);
         return false;
     }
     const channel = guild.channels.cache.find(chan => (chan.name === channelName));
@@ -411,6 +416,15 @@ const getChannel = (guildName, channelName) => {
         return false;
     }
     return channel;
+}
+
+const getGuild = (guildName) => {
+    const guild = client.guilds.cache.find(guild => (guild.name === guildName));
+    if (!guild) {
+        console.log(`Guild not found! Client guilds: ${client.guilds.cache}`);
+        return false;
+    }
+    return guild;
 }
 
 const readFile = async (url, guild) => {

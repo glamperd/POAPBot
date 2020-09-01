@@ -62,4 +62,4 @@ The bot will report the number of codes available when a file is uploaded. The n
 ### Data stores
 Event data is stored in a PostgreSQL database, and will be preserved indefinitely. Members participating in an event will be tracked in a Redis data store. This enables the bot to avoid responding more than once to a member. The Redis data store is not persistent, and will eventually be cleared. In any case, the store will be cleared at the start of an event. 
 
-Codes are stored in Redis, with a unique set for each guild. The set will be lost in the event that Redis is shut down, and reloaded from file if the bot is shut down and restarted. This must not happen while an event is in progress, or codes will be re-loaded from the file and possibly re-used.
+Codes are stored in Redis, with a unique set for each guild. The set will be lost in the event that Redis is shut down, and reloaded from file if the bot is shut down and restarted. Therefore, certain combinations of events could either cause codes to be unavailable or cause them to be reused. E.g. restarting the bot after an event has started.
