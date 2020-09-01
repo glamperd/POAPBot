@@ -428,7 +428,7 @@ const getGuild = (guildName) => {
 
 const getEmoji = (guildName, emojiName) => {
         // Set reaction emoji
-        const guild = getGuild(event.server);
+        const guild = getGuild(guildName);
         if (guild) {
             return guild.emojis.cache.find(emoji => emoji.name === emojiName);
         }
