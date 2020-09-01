@@ -439,7 +439,7 @@ const getEmoji = (guildName, emojiName) => {
                 console.log(`Found emoji ${emoji.toString()} id ${emoji.identifier}`);
             } else {
 
-                console.log(`Emoji ${emojiName} not found. Guild emojis ${JSON.stringify(guild.emojis.cache)} `);
+                console.log(`Emoji ${emojiName} not found. Guild emojis ${JSON.stringify(guild.emojis.cache)} ${JSON.stringify(client.emojis.cache)} `);
             }
         }
         return false;
