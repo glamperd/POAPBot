@@ -210,6 +210,8 @@ const handleStepAnswer = async (message) => {
         case steps.REACTION: {
             if (answer === '-') answer = state.event.reaction || defaultReaction;
             state.event.reaction = answer;
+            const emoji = getEmoji(state.event.server, answer);
+            await message.react(emoji);
             state.next = steps.FILE;
             state.dm.send(`Please attach a CSV file containing tokens`);
             break;
@@ -254,7 +256,7 @@ const handleEventMessage = async (message) => {
         // Send DM
         sendDM(message.author, newMsg);
         // Add reaction
-        message.react(event.reaction_emoji);
+        await message.react(event.reaction_emoji);
 
         event.user_count ++;
 
@@ -327,10 +329,7 @@ const startEvent = async (event) => {
     sendMessageToChannel(event.server, event.channel, event.start_message);
 
     // Set reaction emoji
-    const guild = getGuild(event.server);
-    if (guild) {
-        event.reaction_emoji = guild.emojis.cache.find(emoji => emoji.name === event.reaction);
-    }
+    event.reaction_emoji = getemoji(event.server, event.reaction);
 
     // Initialise redis set
     await clearEventSet(event.server);
@@ -425,6 +424,15 @@ const getGuild = (guildName) => {
         return false;
     }
     return guild;
+}
+
+const getEmoji = (guildName, emojiName) => {
+        // Set reaction emoji
+        const guild = getGuild(event.server);
+        if (guild) {
+            return guild.emojis.cache.find(emoji => emoji.name === emojiName);
+        }
+        return false;
 }
 
 const readFile = async (url, guild) => {
