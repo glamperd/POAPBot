@@ -431,11 +431,15 @@ const getEmoji = (guildName, emojiName) => {
         const guild = getGuild(guildName);
         if (guild) {
             console.log(`looking for ${emojiName}`);
-            const emoji = guild.emojis.cache.find(emoji => emoji.identifier === emojiName);
+            let emoji = guild.emojis.cache.find(emoji => emoji.identifier === emojiName);
+            if (!emoji) {
+                emoji = client.emojis.cache.find(emoji => emoji.identifier === emojiName);
+            }
             if (emoji) {
                 console.log(`Found emoji ${emoji.toString()} id ${emoji.identifier}`);
             } else {
-                console.log(`Emoji ${emojiName} not found. Guild emojis ${JSON.stringify(guild.emojis)} `);
+
+                console.log(`Emoji ${emojiName} not found. Guild emojis ${JSON.stringify(guild.emojis.cache)} `);
             }
         }
         return false;
