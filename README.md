@@ -48,6 +48,8 @@ The bot will collect these parameters in a private dialog in response to the *!s
 Start and end dates should be entered as a date-time string in the UTC +0 time zone. Example:
 `2020-08-18 13:00`
 
+When asked for a reaction, if the default is not to be used, enter the name of the emoji surrounded by colons, e.g. `:medal:` The bot will react to this message itself, as a test.
+
 The bot will offer a default value for each parameter. If an event is being modified, the default value will be the event's current value. To select the default value, respond with a `-` (hyphen) character.
 
 ### Codes
