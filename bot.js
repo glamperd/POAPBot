@@ -430,7 +430,7 @@ const getEmoji = (guildName, emojiName) => {
         // Set reaction emoji
         const guild = getGuild(guildName);
         if (guild) {
-            const emoji = guild.emojis.cache.find(emoji => emoji.name === emojiName);
+            const emoji = guild.emojis.cache.find(emoji => emoji.identifier === emojiName);
             if (emoji) {
                 console.log(`Found emoji ${emoji.toString()} id ${emoji.identifier}`);
             } else {
