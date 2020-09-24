@@ -18,6 +18,7 @@ const steps = {
   END_MSG: "end_msg",
   RESPONSE: "response",
   REACTION: "reaction",
+  PASS: "pass",
   FILE: "file",
 };
 
@@ -26,6 +27,7 @@ const defaultStartMessage =
 const defaultEndMessage = "The POAP distribution event has ended.";
 const defaultResponseMessage =
   "Here is a link where you can claim your POAP token: http://poap.xyz/{code} Thanks for participating in the event. ";
+const defaultPass = "-";
 const defaultReaction = "🏅";
 const codeSet = "#codes";
 
@@ -119,7 +121,6 @@ const botCommands = async (message) => {
     // Check that user is an admin in this guild
     if (message.content.includes("!setup") && state.state !== states.SETUP) {
       // one at a time
-
       console.log(`user has permission`);
       // Get any current record for this guild
       //state.event = getEvent(message.guild.name);
@@ -174,7 +175,7 @@ const handleStepAnswer = async (message) => {
         state.event.channel = answer;
         state.next = steps.START;
         state.dm.send(
-          `Date and time to start? ${state.event.start_time || ""}`
+          `Date and time to start? (${state.event.start_time || ""})`
         );
       }
       break;
@@ -240,6 +241,17 @@ const handleStepAnswer = async (message) => {
       //const emoji = getEmoji(state.event.server, answer);
       console.log(`reacting with ${answer}`);
       await message.react(answer);
+      state.next = steps.PASS;
+      state.dm.send(
+        `You can add a secret 🔒  pass (like a word, a hash from youtube or a complete link). If you don't need a password just answer with "-"`
+      );
+      break;
+    }
+    case steps.PASS: {
+      if (answer === "-") answer = state.event.pass || defaultPass;
+      state.event.pass = answer;
+      //const emoji = getEmoji(state.event.server, answer);
+      console.log(`pass to get the POAP ${answer}`);
       state.next = steps.FILE;
       state.dm.send(`Please attach a CSV file containing tokens`);
       break;
@@ -273,27 +285,34 @@ const handleStepAnswer = async (message) => {
 
 const handleEventMessage = async (message) => {
   let event = getGuildEvent(message.channel.guild.name);
+  console.log(`is ${event.pass} in msg: ${message.content}`);
+  if (event.pass == "-" || message.content.toLowerCase().includes(event.pass.toLowerCase())) {
+    console.log("YEEES!");
+    const check = await addToSet(event.server, message.author.username);
+    console.log(`Check redis: ${check}`);
+    if (check) {
+      // Get code
+      const code = await popFromSet(event.server + codeSet);
+      console.log(`Code found: ${code}`);
 
-  // Check whether already responded (Redis)
-  const check = await addToSet(event.server, message.author.username);
-  console.log(`Check redis: ${check}`);
-  if (check) {
-    // Get code
-    const code = await popFromSet(event.server + codeSet);
-    console.log(`Code found: ${code}`);
+      // replace placeholder in message
+      const newMsg = event.response_message.replace("{code}", code);
 
-    // replace placeholder in message
-    const newMsg = event.response_message.replace("{code}", code);
+      // Send DM
+      sendDM(message.author, newMsg);
+      // Add reaction
+      await message.react(event.reaction);
 
-    // Send DM
-    sendDM(message.author, newMsg);
-    // Add reaction
-    await message.react(event.reaction);
+      event.user_count++;
 
-    event.user_count++;
-
-    // TODO ?? Add to used codes map ??
+      // TODO ?? Add to used codes map ??
+    }
+  } else {
+    console.log(`sorry wrong pass: ${message.content}`);
+    // now react !
+    message.react("❌");
   }
+  // Check whether already responded (Redis)
 };
 
 //-------------------------------------------
@@ -418,6 +437,7 @@ const formattedEvent = async (event) => {
     Event end message: ${event.end_message}
     Response to member messages: ${event.response_message}
     Reaction to awarded messages: ${event.reaction}
+    Pass to get the code: ${event.pass}
     Data url: ${event.file_url}
     Codes available: ${await setSize(event.server + codeSet)}
     Members awarded: ${event.user_count}
@@ -559,7 +579,7 @@ const saveEvent = async (event) => {
       console.log(`Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
       res = await pgClient.query(
         "UPDATE event " +
-          "SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, user_count=$8, file_url=$9 " +
+          "SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, pass=$8, user_count=$9, file_url=$10 " +
           "WHERE id=$10",
         [
           event.channel,
@@ -569,6 +589,7 @@ const saveEvent = async (event) => {
           event.end_message,
           event.response_message,
           event.reaction,
+          event.pass,
           event.user_count,
           event.file_url,
           oldEvent.id,
@@ -580,8 +601,8 @@ const saveEvent = async (event) => {
       // INSERT
       res = await pgClient.query(
         "INSERT INTO event " +
-          "(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, user_count, file_url) " +
-          "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10)",
+          "(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, pass, user_count, file_url) " +
+          "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11)",
         [
           uuid,
           event.server,
@@ -592,6 +613,7 @@ const saveEvent = async (event) => {
           event.end_message,
           event.response_message,
           event.reaction,
+          event.pass,
           event.file_url,
         ]
       );
