@@ -3,12 +3,27 @@ const { Client } = require("pg");
 const redis = require("redis");
 const { promisify } = require("util");
 const axios = require("axios");
+const pino = require('pino')
+
+const logger = pino({
+  prettyPrint: {
+    colorize: true, // --colorize
+    errorLikeObjectKeys: ['err', 'error'], // --errorLikeObjectKeys
+    levelFirst: false, // --levelFirst
+    messageKey: 'msg', // --messageKey
+    levelKey: 'level', // --levelKey
+    timestampKey: 'time', // --timestampKey
+    translateTime: false, // --translateTime
+    ignore: 'pid,hostname', // --ignore,
+  }
+})
 
 const states = {
   LISTEN: "listen",
   SETUP: "setup",
   EVENT: "event",
 };
+
 const steps = {
   NONE: "none",
   CHANNEL: "channel",
@@ -55,7 +70,7 @@ var dbConnected = false;
 const redisClient = redis.createClient(process.env.REDIS_URL);
 
 client.on("ready", () => {
-  console.log("Discord client ready!");
+  logger.info("[SETUP] Discord client ready!");
 
   (async () => {
     await pgClient.connect();
@@ -63,7 +78,7 @@ client.on("ready", () => {
     const res = await pgClient.query("SELECT $1::text as message", [
       "DB ready",
     ]);
-    console.log(res.rows[0].message); // Hello world!
+    logger.info(`[SETUP] ${res.rows[0].message}`); // Hello world!
     //await pgClient.end()
 
     loadPendingEvents();
@@ -75,11 +90,11 @@ client.on("message", async (message) => {
     message.reply("pong");
   } else if (!message.author.bot) {
     if (message.channel.type === "dm") {
-      console.log(
-        `DM Message ${message.content} from ${message.author.username} in ${message.channel.type}`
+      logger.info(
+        `[ONMSG] ${message.channel.type} - ${message.content} from ${message.author.username}`
       );
-      console.log(
-        `state ${state.state} user ${state.user ? state.user.id : "-"}`
+      logger.info(
+        `[ONMSG] state ${state.state} user ${state.user ? state.user.id : "-"}`
       );
       if (state.state === states.SETUP && state.user.id === message.author.id) {
         handleStepAnswer(message);
@@ -99,16 +114,16 @@ const sendDM = async (user, message) => {
 // Message handling
 
 const handlePublicMessage = async (message) => {
-  console.log(
-    `Message ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`
+  logger.info(
+    `[PUBMSG] ${message.content} from ${message.author.username} in guild ${message.channel.guild.name} #${message.channel.name}`
   );
+
   const bot = client.user;
-  //console.log(`bot user ID ${bot.id} ${bot.username}`);
 
   const event = getGuildEvent(message.channel.guild.name);
 
   if (message.mentions.has(bot)) {
-    console.log(`Message mentions me`);
+    logger.info(`[PUBMSG] ${message.author.username} - Message mentions me`);
     botCommands(message);
   } else if (eventIsCurrent(event, message.channel.name)) {
     // In-event message. Respond with reaction and DM
@@ -121,26 +136,26 @@ const botCommands = async (message) => {
     // Check that user is an admin in this guild
     if (message.content.includes("!setup") && state.state !== states.SETUP) {
       // one at a time
-      console.log(`user has permission`);
+      logger.info(`[BOT] user has permission`);
       // Get any current record for this guild
       //state.event = getEvent(message.guild.name);
       // start dialog in PM
       await setupState(message.author, message.channel.guild.name);
     } else if (message.content.includes("!list")) {
-      console.log(`list event `);
+      logger.info(`[BOT] list event `);
       const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
       if (event && event.server) {
-        console.log(`event ${JSON.stringify(event)}`);
+        logger.info(`[BOT] event ${JSON.stringify(event)}`);
         sendDM(message.author, await formattedEvent(event));
       } else {
-        console.log(`No current event`);
+        logger.info(`[BOT] No current event`);
         sendDM(
           message.author,
           `No event is currently set up for ${message.channel.guild.name}. Use the !setup command to set one up.`
         );
       }
     } else if (message.content.includes("!status")) {
-      console.log(`status request`);
+      logger.info(`[BOT] status request`);
       sendDM(message.author, `Current status: ${state.state}`);
       const event = getGuildEvent(message.channel.guild.name, false); // Don't auto-create
       if (event && event.server) {
@@ -150,7 +165,7 @@ const botCommands = async (message) => {
       message.reply(`Commands are: !setup, !list, !status`);
     }
   } else {
-    console.log(`user lacks permission, or invalid command`);
+    logger.info(`[BOT] user lacks permission, or invalid command`);
     message.react("❗");
   }
 };
@@ -160,7 +175,7 @@ const handleStepAnswer = async (message) => {
   let answer = message.content;
   switch (state.next) {
     case steps.CHANNEL: {
-      console.log(`step answer ${state.event.id}`);
+      logger.info(`[STEPS] answer ${state.event.id}`);
       if (answer === "-") answer = state.event.channel;
       if (answer.startsWith("#")) answer = answer.substring(1);
       // Confirm that channel exists
@@ -239,7 +254,7 @@ const handleStepAnswer = async (message) => {
       if (answer === "-") answer = state.event.reaction || defaultReaction;
       state.event.reaction = answer;
       //const emoji = getEmoji(state.event.server, answer);
-      console.log(`reacting with ${answer}`);
+      logger.info(`[STEPS] reacting with ${answer}`);
       await message.react(answer);
       state.next = steps.PASS;
       state.dm.send(
@@ -251,7 +266,7 @@ const handleStepAnswer = async (message) => {
       if (answer === "-") answer = state.event.pass || defaultPass;
       state.event.pass = answer;
       //const emoji = getEmoji(state.event.server, answer);
-      console.log(`pass to get the POAP ${answer}`);
+      logger.info(`[STEPS] pass to get the POAP ${answer}`);
       state.next = steps.FILE;
       state.dm.send(`Please attach a CSV file containing tokens`);
       break;
@@ -261,7 +276,7 @@ const handleStepAnswer = async (message) => {
         state.dm.send(`No file attachment found!`);
       } else {
         const ma = message.attachments.first();
-        console.log(`File ${ma.name} ${ma.url} ${ma.id} is attached`);
+        logger.info(`[STEPS] File ${ma.name} ${ma.url} ${ma.id} is attached`);
         state.event.file_url = ma.url;
         await readFile(ma.url, state.event.server);
         // Report number of codes added
@@ -285,15 +300,14 @@ const handleStepAnswer = async (message) => {
 
 const handleEventMessage = async (message) => {
   let event = getGuildEvent(message.channel.guild.name);
-  console.log(`is ${event.pass} in msg: ${message.content}`);
+  logger.info(`[EVENTMSG] is ${event.pass} in msg: ${message.content}`);
   if (event.pass == "-" || message.content.toLowerCase().includes(event.pass.toLowerCase())) {
-    console.log("YEEES!");
     const check = await addToSet(event.server, message.author.username);
-    console.log(`Check redis: ${check}`);
+    logger.info(`[EVENTMSG] Check redis: ${check}`);
     if (check) {
       // Get code
       const code = await popFromSet(event.server + codeSet);
-      console.log(`Code found: ${code}`);
+      logger.info(`[EVENTMSG] Code found: ${code}`);
 
       // replace placeholder in message
       const newMsg = event.response_message.replace("{code}", code);
@@ -304,11 +318,11 @@ const handleEventMessage = async (message) => {
       await message.react(event.reaction);
 
       event.user_count++;
-
+      logUserAndCode(event, message.author.username, code)
       // TODO ?? Add to used codes map ??
     }
   } else {
-    console.log(`sorry wrong pass: ${message.content}`);
+    logger.info(`[EVENTMSG] sorry wrong pass: ${message.content}`);
     // now react !
     message.react("❌");
   }
@@ -320,11 +334,11 @@ const handleEventMessage = async (message) => {
 
 // Initialise the state for a setup dialog
 const setupState = async (user, guild) => {
-  console.log(`setupState ${guild}`);
+  logger.info(`[SETUP] setupState ${guild}`);
   state.state = states.SETUP;
   state.next = steps.CHANNEL;
   state.event = getGuildEvent(guild); // Will create one if not already
-  console.log(`created or got event ${JSON.stringify(state.event)}`);
+  logger.info(`[SETUP] created or got event ${JSON.stringify(state.event)}`);
   state.dm = await user.createDM();
   state.dm.send(
     `Hi ${user.username}! You want to set me up for an event in ${guild}? I'll ask for the details, one at a time.`
@@ -336,7 +350,6 @@ const setupState = async (user, guild) => {
     })`
   );
   state.user = user;
-  //if (!state.event.id) { state.event.server = guild; }
   resetExpiry();
 };
 
@@ -353,7 +366,7 @@ const resetExpiry = () => {
 };
 
 const clearSetup = () => {
-  console.log(`Clearing setup. Event in ${state.event.server} `);
+  logger.info(`[SETUP] Clearing setup. Event in ${state.event.server} `);
   state.state = states.LISTEN;
   state.dm = undefined;
   state.event = {};
@@ -377,8 +390,8 @@ const startEventTimer = (event) => {
   // get seconds until event start
   const millisecs = getMillisecsUntil(event.start_time);
   if (millisecs >= 0) {
-    console.log(
-      `Event starting at ${event.start_time}, in ${millisecs / 1000} secs`
+    logger.info(
+      `[TIMER] Event starting at ${event.start_time}, in ${millisecs / 1000} secs`
     );
     // set timeout. Call startEvent on timeout
     state.eventTimer = setTimeout((ev) => startEvent(ev), millisecs, event);
@@ -386,7 +399,7 @@ const startEventTimer = (event) => {
 };
 
 const startEvent = async (event) => {
-  console.log(`event started: ${JSON.stringify(event)}`);
+  logger.info(`[EVENT] started: ${JSON.stringify(event)}`);
   event.user_count = 0;
   // Send the start message to the channel
   sendMessageToChannel(event.server, event.channel, event.start_message);
@@ -399,7 +412,7 @@ const startEvent = async (event) => {
 
   // Set timer for event end
   const millisecs = getMillisecsUntil(event.end_time);
-  console.log(`Event ending in ${millisecs / 1000} secs`);
+  logger.info(`[EVENT] ending in ${millisecs / 1000} secs`);
   state.endEventTimer = setTimeout((ev) => endEvent(ev), millisecs, event);
 };
 
@@ -408,7 +421,7 @@ const getMillisecsUntil = (time) => {
 };
 
 const endEvent = async (event) => {
-  console.log(`event ended: ${JSON.stringify(event)}`);
+  logger.info(`[EVENT] ended: ${JSON.stringify(event)}`);
   state.state = states.LISTEN;
   // send the event end message
   sendMessageToChannel(event.server, event.channel, event.end_message);
@@ -459,8 +472,8 @@ const getGuildEvent = (guild, autoCreate = true) => {
 // Discord functions
 
 const sendMessageToChannel = async (guildName, channelName, message) => {
-  console.log(
-    `sendMessageToChannel ${guildName} ${channelName} msg ${message}`
+  logger.info(
+    `[CHANNELMSG] sendMessageToChannel ${guildName} ${channelName} msg ${message}`
   );
   const channel = getChannel(guildName, channelName);
   if (!channel) {
@@ -478,8 +491,8 @@ const getChannel = (guildName, channelName) => {
     (chan) => chan.name === channelName
   );
   if (!channel) {
-    console.log(
-      `Channel not found! Guild channels: ${guild.channels.cache.size}`
+    logger.info(
+      `[CHANNELMSG] Channel not found! Guild channels: ${guild.channels.cache.size}`
     );
     return false;
   }
@@ -489,7 +502,7 @@ const getChannel = (guildName, channelName) => {
 const getGuild = (guildName) => {
   const guild = client.guilds.cache.find((guild) => guild.name === guildName);
   if (!guild) {
-    console.log(`Guild not found! Client guilds: ${client.guilds.cache}`);
+    logger.info(`[GUILD] not found! Client guilds: ${client.guilds.cache}`);
     return false;
   }
   return guild;
@@ -499,7 +512,7 @@ const getEmoji = (guildName, emojiName) => {
   // Set reaction emoji
   const guild = getGuild(guildName);
   if (guild) {
-    console.log(`looking for ${emojiName}`);
+    logger.info(`looking for ${emojiName}`);
     let emoji = guild.emojis.cache.find(
       (emoji) => emoji.identifier === emojiName
     );
@@ -509,10 +522,10 @@ const getEmoji = (guildName, emojiName) => {
       );
     }
     if (emoji) {
-      console.log(`Found emoji ${emoji.toString()} id ${emoji.identifier}`);
+      logger.info(`[EMOJI] Found emoji ${emoji.toString()} id ${emoji.identifier}`);
     } else {
-      console.log(
-        `Emoji ${emojiName} not found. Guild emojis ${JSON.stringify(
+      logger.info(
+        `[EMOJI] ${emojiName} not found. Guild emojis ${JSON.stringify(
           guild.emojis.cache
         )} ${JSON.stringify(client.emojis.cache)} `
       );
@@ -524,17 +537,16 @@ const getEmoji = (guildName, emojiName) => {
 const readFile = async (url, guild) => {
   try {
     const res = await axios.get(url);
-    console.log(`File data: ${res.data}`);
     const setName = guild + codeSet;
     res.data.split("\n").forEach((val) => {
-      console.log(`code ${val}`);
       // Add to redis set
       if (val.length > 0) {
+        logger.info(`-> code added: ${val}`);
         addToSet(setName, val);
       }
     });
   } catch (err) {
-    console.log(`Error reading file: ${err}`);
+    logger.error(`[CODES] Error reading file: ${err}`);
   }
 };
 
@@ -555,7 +567,7 @@ const getEvent = async (guild) => {
       "SELECT * FROM event WHERE server = $1::text",
       [guild]
     );
-    console.log(`Event retrieved from DB: ${JSON.stringify(res.rows[0])}`);
+    logger.info(`[EVENT] retrieved from DB: ${JSON.stringify(res.rows[0])}`);
     //await pgClient.end();
     if (res.rows.length > 0) {
       return res.rows[0];
@@ -563,7 +575,7 @@ const getEvent = async (guild) => {
       return {};
     }
   } catch (err) {
-    console.log(`Error while getting event: ${err}`);
+    logger.error(`[EVENT] Error while getting event: ${err}`);
     return {};
   }
 };
@@ -576,7 +588,7 @@ const saveEvent = async (event) => {
     let oldEvent = await getEvent(event.server);
     if (oldEvent.id) {
       // UPDATE
-      console.log(`Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
+      logger.info(`[PG] Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
       res = await pgClient.query(
         "UPDATE event " +
           "SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, pass=$8, user_count=$9, file_url=$10 " +
@@ -597,7 +609,7 @@ const saveEvent = async (event) => {
       );
     } else {
       const uuid = uuidv4();
-      console.log(`Inserting... ${uuid} to ${JSON.stringify(event)}`);
+      logger.info(`[PG] Inserting... ${uuid} to ${JSON.stringify(event)}`);
       // INSERT
       res = await pgClient.query(
         "INSERT INTO event " +
@@ -619,7 +631,7 @@ const saveEvent = async (event) => {
       );
     }
   } catch (err) {
-    console.log(`Error saving event: ${err}`);
+    logger.error(`[PG] Error saving event: ${err}`);
   }
 };
 
@@ -630,14 +642,38 @@ const updateEventUserCount = async (event) => {
     let res;
     if (event.id) {
       // UPDATE
-      console.log(`Updating user count ... ${event.id} to ${event.user_count}`);
+      logger.info(`[PG] Updating user count ... ${event.id} to ${event.user_count}`);
       res = await pgClient.query(
         "UPDATE event " + "SET user_count=$1 " + "WHERE id=$2",
         [event.user_count, event.id]
       );
     }
   } catch (err) {
-    console.log(`Error saving event: ${err}`);
+    logger.error(`[PG] Error saving event: ${err}`);
+  }
+};
+
+const logUserAndCode = async (event, username, code) => {
+  try {
+    let date = new Date()
+    let res;
+    await checkAndConnectDB();
+      // ADD LOG
+      logger.info(`[PG] adding log to ${username} to ${event.server}|${event.channel}`);
+      res = await pgClient.query(
+        "INSERT INTO logs " +
+          "(server, channel, username, code, date)" +
+          "VALUES ($1, $2, $3, $4, $5)",
+        [
+          event.server,
+          event.channel,
+          username,
+          code,
+          date
+        ]
+      );
+  } catch (err) {
+    logger.error(`[PG] Error logging code: ${err}`);
   }
 };
 
@@ -649,11 +685,11 @@ const loadPendingEvents = async () => {
       "SELECT * FROM event WHERE end_time >= $1::date",
       [new Date()]
     );
-    console.log(`Future events loaded: ${JSON.stringify(res.rows)}`);
+    logger.info(`[PG] Future events loaded: ${JSON.stringify(res.rows)}`);
     if (res.rows.length > 0) {
       // start timer for each one.
       res.rows.forEach((row) => {
-        console.log(`Adding to map: ${row.server}`);
+        logger.info(`Adding to map: ${row.server}`);
         guildEvents.set(row.server, row);
         if (row.file_url) {
           readFile(row.file_url, row.server);
@@ -661,10 +697,10 @@ const loadPendingEvents = async () => {
         startEventTimer(row);
       });
     } else {
-      console.log("No pending events");
+      logger.info("[PG] No pending events");
     }
   } catch (err) {
-    console.log(`Error while getting event: ${err}`);
+    logger.error(`[PG] Error while getting event: ${err}`);
   }
 };
 
@@ -686,37 +722,27 @@ const scardAsync = promisify(redisClient.scard).bind(redisClient);
 const spopAsync = promisify(redisClient.spop).bind(redisClient);
 
 redisClient.on("connect", () => {
-  console.log(`Redis client connected`);
+  logger.info(`[SETUP] Redis client connected`);
 });
 
 const clearEventSet = async (guild) => {
   // remove any members from the guild's set. Called prior to an event's start.
   const rem = await delAsync(guild, (err, result) => {
-    console.log(`Set deleted: ${guild} - ${err} -  ${result} keys removed`);
+    logger.info(`Set deleted: ${guild} - ${err} -  ${result} keys removed`);
     return result;
   });
-  console.log(`Set removed ${rem}`);
+  logger.info(`Set removed ${rem}`);
 };
-
-// const isSetMember = async (guild, member) => {
-//     // returns true if a member (discord user) is already in the event's set
-//     let count = 0;
-//     await sismemberAsync(guild, member, (err, result) => {
-//         if (err) return 0;
-//         count = result;
-//     });
-//     return count;
-// }
 
 const addToSet = async (guild, member) => {
   // adds a user to an event's set
   // returns 0 if already in the set, 1 otherwise
   let c = await saddAsync(guild, member, (err, result) => {
-    console.log(`Redis SADD -  error ${err} result ${result}`);
+    logger.error(`[REDDIS] Redis SADD -  error ${err} result ${result}`);
     if (err) return 0;
     return result;
   });
-  console.log(`addToSet ${c}`);
+  logger.info(`[REDDIS] addToSet ${c}`);
   return c;
 };
 
@@ -729,6 +755,5 @@ const popFromSet = async (setName) => {
 };
 
 //-------------------------------------------------------------------------------------------
-
 // THIS  MUST  BE  THIS  WAY
 client.login(process.env.BOT_TOKEN);
