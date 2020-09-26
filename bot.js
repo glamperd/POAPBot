@@ -280,9 +280,7 @@ const handleStepAnswer = async (message) => {
         state.event.file_url = ma.url;
         let total_count = await readFile(ma.url, state.event.server);
         // Report number of codes added
-        state.dm.send(
-          `${total_count} codes added`
-        );
+        state.dm.send(`${total_count} codes added`);
       }
       state.next = steps.NONE;
       state.dm.send(
@@ -543,30 +541,29 @@ const getEmoji = (guildName, emojiName) => {
 
 const readFile = async (url, guild) => {
   return new Promise(async (resolve, reject) => {
-  try {
-    const res = await axios.get(url);
-    const setName = guild + codeSet;
-    logger.info(`[CODES] setName: ${setName}`);
-    let count = 0;
-    csv
-      .parseString(res.data, { headers: false })
-      .on("data", function (code) {
-        if (code.length) {
-          logger.info(`-> code added: ${code}`);
-          count += 1;
-          addToSet(setName, code);
-        }
-      })
-      .on("end", function () {
-        logger.info(`[CODES] total codes ${count}`);
-        resolve(count);
-      })
-      .on("error", (error) => logger.error(error));
-  } catch (err) {
-    logger.error(`[CODES] Error reading file: ${err}`);
-  }
-})
-
+    try {
+      const res = await axios.get(url);
+      const setName = guild + codeSet;
+      logger.info(`[CODES] setName: ${setName}`);
+      let count = 0;
+      csv
+        .parseString(res.data, { headers: false })
+        .on("data", function (code) {
+          if (code.length) {
+            logger.info(`-> code added: ${code}`);
+            count += 1;
+            addToSet(setName, code);
+          }
+        })
+        .on("end", function () {
+          logger.info(`[CODES] total codes ${count}`);
+          resolve(count);
+        })
+        .on("error", (error) => logger.error(error));
+    } catch (err) {
+      logger.error(`[CODES] Error reading file: ${err}`);
+    }
+  });
 };
 
 //-------------------------------------------------------------------------------------------------
