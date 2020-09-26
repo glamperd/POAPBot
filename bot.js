@@ -120,7 +120,6 @@ const handlePublicMessage = async (message) => {
   );
 
   const bot = client.user;
-
   const event = getGuildEvent(message.channel.guild.name);
 
   if (message.mentions.has(bot)) {
@@ -279,10 +278,10 @@ const handleStepAnswer = async (message) => {
         const ma = message.attachments.first();
         logger.info(`[STEPS] File ${ma.name} ${ma.url} ${ma.id} is attached`);
         state.event.file_url = ma.url;
-        await readFile(ma.url, state.event.server);
+        let total_count = await readFile(ma.url, state.event.server);
         // Report number of codes added
         state.dm.send(
-          `${await setSize(state.event.server + codeSet)} codes added`
+          `${total_count} codes added`
         );
       }
       state.next = steps.NONE;
@@ -543,9 +542,11 @@ const getEmoji = (guildName, emojiName) => {
 };
 
 const readFile = async (url, guild) => {
+  return new Promise(async (resolve, reject) => {
   try {
     const res = await axios.get(url);
     const setName = guild + codeSet;
+    logger.info(`[CODES] setName: ${setName}`);
     let count = 0;
     csv
       .parseString(res.data, { headers: false })
@@ -557,12 +558,15 @@ const readFile = async (url, guild) => {
         }
       })
       .on("end", function () {
-        logger.info("[CODES] total codes ", count);
+        logger.info(`[CODES] total codes ${count}`);
+        resolve(count);
       })
       .on("error", (error) => logger.error(error));
   } catch (err) {
     logger.error(`[CODES] Error reading file: ${err}`);
   }
+})
+
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -609,7 +613,7 @@ const saveEvent = async (event) => {
       res = await pgClient.query(
         "UPDATE event " +
           "SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, pass=$8, user_count=$9, file_url=$10 " +
-          "WHERE id=$10",
+          "WHERE id=$11",
         [
           event.channel,
           event.start_time,
@@ -631,7 +635,7 @@ const saveEvent = async (event) => {
       res = await pgClient.query(
         "INSERT INTO event " +
           "(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, pass, user_count, file_url) " +
-          "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11)",
+          "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
         [
           uuid,
           event.server,
@@ -643,6 +647,7 @@ const saveEvent = async (event) => {
           event.response_message,
           event.reaction,
           event.pass,
+          0,
           event.file_url,
         ]
       );
@@ -668,7 +673,7 @@ const updateEventUserCount = async (event) => {
       );
     }
   } catch (err) {
-    logger.error(`[PG] Error saving event: ${err}`);
+    logger.error(`[PG] Error updating event: ${err}`);
   }
 };
 
