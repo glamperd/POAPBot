@@ -3,20 +3,21 @@ const { Client } = require("pg");
 const redis = require("redis");
 const { promisify } = require("util");
 const axios = require("axios");
-const pino = require('pino')
+const csv = require("fast-csv");
+const pino = require("pino");
 
 const logger = pino({
   prettyPrint: {
     colorize: true, // --colorize
-    errorLikeObjectKeys: ['err', 'error'], // --errorLikeObjectKeys
+    errorLikeObjectKeys: ["err", "error"], // --errorLikeObjectKeys
     levelFirst: false, // --levelFirst
-    messageKey: 'msg', // --messageKey
-    levelKey: 'level', // --levelKey
-    timestampKey: 'time', // --timestampKey
+    messageKey: "msg", // --messageKey
+    levelKey: "level", // --levelKey
+    timestampKey: "time", // --timestampKey
     translateTime: false, // --translateTime
-    ignore: 'pid,hostname', // --ignore,
-  }
-})
+    ignore: "pid,hostname", // --ignore,
+  },
+});
 
 const states = {
   LISTEN: "listen",
@@ -301,7 +302,10 @@ const handleStepAnswer = async (message) => {
 const handleEventMessage = async (message) => {
   let event = getGuildEvent(message.channel.guild.name);
   logger.info(`[EVENTMSG] is ${event.pass} in msg: ${message.content}`);
-  if (event.pass == "-" || message.content.toLowerCase().includes(event.pass.toLowerCase())) {
+  if (
+    event.pass == "-" ||
+    message.content.toLowerCase().includes(event.pass.toLowerCase())
+  ) {
     const check = await addToSet(event.server, message.author.username);
     logger.info(`[EVENTMSG] Check redis: ${check}`);
     if (check) {
@@ -318,7 +322,7 @@ const handleEventMessage = async (message) => {
       await message.react(event.reaction);
 
       event.user_count++;
-      logUserAndCode(event, message.author.username, code)
+      logUserAndCode(event, message.author.username, code);
       // TODO ?? Add to used codes map ??
     }
   } else {
@@ -391,7 +395,9 @@ const startEventTimer = (event) => {
   const millisecs = getMillisecsUntil(event.start_time);
   if (millisecs >= 0) {
     logger.info(
-      `[TIMER] Event starting at ${event.start_time}, in ${millisecs / 1000} secs`
+      `[TIMER] Event starting at ${event.start_time}, in ${
+        millisecs / 1000
+      } secs`
     );
     // set timeout. Call startEvent on timeout
     state.eventTimer = setTimeout((ev) => startEvent(ev), millisecs, event);
@@ -522,7 +528,9 @@ const getEmoji = (guildName, emojiName) => {
       );
     }
     if (emoji) {
-      logger.info(`[EMOJI] Found emoji ${emoji.toString()} id ${emoji.identifier}`);
+      logger.info(
+        `[EMOJI] Found emoji ${emoji.toString()} id ${emoji.identifier}`
+      );
     } else {
       logger.info(
         `[EMOJI] ${emojiName} not found. Guild emojis ${JSON.stringify(
@@ -538,13 +546,20 @@ const readFile = async (url, guild) => {
   try {
     const res = await axios.get(url);
     const setName = guild + codeSet;
-    res.data.split("\n").forEach((val) => {
-      // Add to redis set
-      if (val.length > 0) {
-        logger.info(`-> code added: ${val}`);
-        addToSet(setName, val);
-      }
-    });
+    let count = 0;
+    csv
+      .parseString(res.data, { headers: false })
+      .on("data", function (code) {
+        if (code.length) {
+          logger.info(`-> code added: ${code}`);
+          count += 1;
+          addToSet(setName, code);
+        }
+      })
+      .on("end", function () {
+        logger.info("[CODES] total codes ", count);
+      })
+      .on("error", (error) => logger.error(error));
   } catch (err) {
     logger.error(`[CODES] Error reading file: ${err}`);
   }
@@ -588,7 +603,9 @@ const saveEvent = async (event) => {
     let oldEvent = await getEvent(event.server);
     if (oldEvent.id) {
       // UPDATE
-      logger.info(`[PG] Updating... ${oldEvent.id} to ${JSON.stringify(event)}`);
+      logger.info(
+        `[PG] Updating... ${oldEvent.id} to ${JSON.stringify(event)}`
+      );
       res = await pgClient.query(
         "UPDATE event " +
           "SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, pass=$8, user_count=$9, file_url=$10 " +
@@ -642,7 +659,9 @@ const updateEventUserCount = async (event) => {
     let res;
     if (event.id) {
       // UPDATE
-      logger.info(`[PG] Updating user count ... ${event.id} to ${event.user_count}`);
+      logger.info(
+        `[PG] Updating user count ... ${event.id} to ${event.user_count}`
+      );
       res = await pgClient.query(
         "UPDATE event " + "SET user_count=$1 " + "WHERE id=$2",
         [event.user_count, event.id]
@@ -655,23 +674,19 @@ const updateEventUserCount = async (event) => {
 
 const logUserAndCode = async (event, username, code) => {
   try {
-    let date = new Date()
+    let date = new Date();
     let res;
     await checkAndConnectDB();
-      // ADD LOG
-      logger.info(`[PG] adding log to ${username} to ${event.server}|${event.channel}`);
-      res = await pgClient.query(
-        "INSERT INTO logs " +
-          "(server, channel, username, code, date)" +
-          "VALUES ($1, $2, $3, $4, $5)",
-        [
-          event.server,
-          event.channel,
-          username,
-          code,
-          date
-        ]
-      );
+    // ADD LOG
+    logger.info(
+      `[PG] adding log to ${username} to ${event.server}|${event.channel}`
+    );
+    res = await pgClient.query(
+      "INSERT INTO logs " +
+        "(server, channel, username, code, date)" +
+        "VALUES ($1, $2, $3, $4, $5)",
+      [event.server, event.channel, username, code, date]
+    );
   } catch (err) {
     logger.error(`[PG] Error logging code: ${err}`);
   }
@@ -737,12 +752,8 @@ const clearEventSet = async (guild) => {
 const addToSet = async (guild, member) => {
   // adds a user to an event's set
   // returns 0 if already in the set, 1 otherwise
-  let c = await saddAsync(guild, member, (err, result) => {
-    logger.error(`[REDDIS] Redis SADD -  error ${err} result ${result}`);
-    if (err) return 0;
-    return result;
-  });
-  logger.info(`[REDDIS] addToSet ${c}`);
+  let c = await saddAsync(guild, member);
+  logger.info(`[REDDIS] addToSet ${member} => ${c}`);
   return c;
 };
 
