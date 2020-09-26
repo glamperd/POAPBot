@@ -42,7 +42,7 @@ const defaultStartMessage =
   "The POAP distribution event is now active. Post a message in this channel to earn your POAP token.";
 const defaultEndMessage = "The POAP distribution event has ended.";
 const defaultResponseMessage =
-  "Here is a link where you can claim your POAP token: http://poap.xyz/claim/{code} Thanks for participating in the event.";
+  "Thanks for participating in the event. Here is a link where you can claim your POAP token: {code} ";
 const defaultPass = "-";
 const defaultReaction = "🏅";
 const codeSet = "#codes";
