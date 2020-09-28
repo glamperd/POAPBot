@@ -46,6 +46,8 @@ const defaultResponseMessage =
 const defaultPass = "-";
 const defaultReaction = "🏅";
 const codeSet = "#codes";
+const welcomenMsg = "Hey!";
+const cantDmMsg = "I can't sent you a DM :/";
 
 var state = {
   state: states.LISTEN,
@@ -81,7 +83,6 @@ client.on("ready", () => {
     ]);
     logger.info(`[SETUP] ${res.rows[0].message}`); // Hello world!
     //await pgClient.end()
-
     loadPendingEvents();
   })();
 });
@@ -107,8 +108,18 @@ client.on("message", async (message) => {
 });
 
 const sendDM = async (user, message) => {
-  const dm = await user.createDM();
-  dm.send(message);
+  return new Promise(async (resolve, reject) => {
+    const dm = await user.createDM();
+    dm.send(message)
+      .then((res) => {
+        logger.info(`[DM] perfect, sent!`);
+        resolve();
+      })
+      .catch((error) => {
+        logger.error(`[DM] error ${error.httpStatus} - ${error.message}`);
+        reject();
+      });
+  });
 };
 
 //-------------------------------
@@ -263,7 +274,7 @@ const handleStepAnswer = async (message) => {
       break;
     }
     case steps.PASS: {
-      if (answer === "-") answer = state.event.pass || defaultPass;
+      if (answer === "-") answer = defaultPass;
       state.event.pass = answer;
       //const emoji = getEmoji(state.event.server, answer);
       logger.info(`[STEPS] pass to get the POAP ${answer}`);
@@ -297,37 +308,77 @@ const handleStepAnswer = async (message) => {
 };
 
 const handleEventMessage = async (message) => {
+  // get event
   let event = getGuildEvent(message.channel.guild.name);
   logger.info(`[EVENTMSG] is ${event.pass} in msg: ${message.content}`);
-  if (
-    event.pass == "-" ||
-    message.content.toLowerCase().includes(event.pass.toLowerCase())
-  ) {
-    const check = await addToSet(event.server, message.author.username);
-    logger.info(`[EVENTMSG] Check redis: ${check}`);
-    if (check) {
-      // Get code
-      const code = await popFromSet(event.server + codeSet);
-      logger.info(`[EVENTMSG] Code found: ${code}`);
 
-      // replace placeholder in message
-      const newMsg = event.response_message.replace("{code}", code);
+  const exist = await memberExist(event.server, message.author.username);
 
-      // Send DM
-      sendDM(message.author, newMsg);
-      // Add reaction
-      await message.react(event.reaction);
+  // check return 1 if new check return 0 if already added
+  logger.info(
+    `[EVENTMSG] Check redis: ${exist} | ${message.author.username} ${
+      exist == 0 ? "new username" : "not new"
+    }`
+  );
+  // 1) check if the user already exist
 
-      event.user_count++;
-      logUserAndCode(event, message.author.username, code);
+  if (exist == 0) {
+    // 2) pass?
+    if (
+      event.pass == "-" ||
+      message.content.toLowerCase().includes(event.pass.toLowerCase())
+    ) {
+      logger.info(`[EVENTMSG] sending welcome to ${message.author.username}`);
+
+      // 3) Say welcome!, the user has DMs open?
+      sendDM(message.author, welcomenMsg)
+        .then(() => {
+          logger.info(`[EVENTMSG] Lets do this ${message.author.username}`);
+          // 4) send code
+          sendCodeToUser(event, message);
+        })
+        .catch(() => {
+          logger.info(
+            `[EVENTMSG] we can't talk with ${message.author.username}`
+          );
+          message.reply(cantDmMsg);
+        });
       // TODO ?? Add to used codes map ??
+    } else {
+      logger.info(`[EVENTMSG] sorry wrong pass: ${message.content}`);
+      // now react !
+      message
+        .react("❌")
+        .catch((error) =>
+          logger.error(
+            `[EVENTMSG] error with reaction ${error.httpStatus} - ${error.message}`
+          )
+        );
     }
   } else {
-    logger.info(`[EVENTMSG] sorry wrong pass: ${message.content}`);
-    // now react !
-    message.react("❌");
+    logger.info(
+      `[EVENTMSG] we can't continue talking with ${message.author.username}`
+    );
   }
   // Check whether already responded (Redis)
+};
+
+const sendCodeToUser = async (event, message) => {
+  const check = await addToSet(event.server, message.author.username);
+  if (check) {
+    const code = await popFromSet(event.server + codeSet);
+    logger.info(`[SENCODE] Code found: ${code}`);
+    // replace placeholder in message
+    const newMsg = event.response_message.replace("{code}", code);
+    // Send DM
+    sendDM(message.author, newMsg);
+    // Add reaction
+    await message.react(event.reaction);
+    event.user_count++;
+    logUserAndCode(event, message.author.username, code);
+  } else {
+    logger.info(`[SENDCODE] ${message.author.username} already has a badge`);
+  }
 };
 
 //-------------------------------------------
@@ -705,8 +756,10 @@ const loadPendingEvents = async () => {
     logger.info(`[PG] Future events loaded: ${JSON.stringify(res.rows)}`);
     if (res.rows.length > 0) {
       // start timer for each one.
-      res.rows.forEach((row) => {
+      res.rows.forEach(async (row) => {
         logger.info(`Adding to map: ${row.server}`);
+        let size = await setSize(row.server + codeSet);
+        size && logger.error(`CAUTION! FOUND OLD EVENTS FOR: ${row.server}`);
         guildEvents.set(row.server, row);
         if (row.file_url) {
           readFile(row.file_url, row.server);
@@ -733,6 +786,7 @@ function uuidv4() {
 // Redis
 
 const saddAsync = promisify(redisClient.sadd).bind(redisClient);
+const sismemberAsync = promisify(redisClient.sismember).bind(redisClient);
 //const sismemberAsync = promisify(redisClient.sismember).bind(redisClient);
 const delAsync = promisify(redisClient.del).bind(redisClient);
 const scardAsync = promisify(redisClient.scard).bind(redisClient);
@@ -749,6 +803,14 @@ const clearEventSet = async (guild) => {
     return result;
   });
   logger.info(`Set removed ${rem}`);
+};
+
+const memberExist = async (guild, member) => {
+  // adds a user to an event's set
+  // returns 0 if already in the set, 1 otherwise
+  let c = await sismemberAsync(guild, member);
+  logger.info(`[REDDIS] sismemberAsync ${member} => ${c}`);
+  return c;
 };
 
 const addToSet = async (guild, member) => {
