@@ -761,9 +761,9 @@ const loadPendingEvents = async () => {
         let size = await setSize(row.server + codeSet);
         size && logger.error(`CAUTION! FOUND OLD EVENTS FOR: ${row.server}`);
         guildEvents.set(row.server, row);
-        if (row.file_url) {
-          readFile(row.file_url, row.server);
-        }
+        // if (row.file_url) {
+        //   readFile(row.file_url, row.server);
+        // }
         startEventTimer(row);
       });
     } else {
