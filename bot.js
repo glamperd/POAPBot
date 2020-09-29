@@ -46,8 +46,10 @@ const defaultResponseMessage =
 const defaultPass = "-";
 const defaultReaction = "🏅";
 const codeSet = "#codes";
+const whitelist = "#whitelist";
 const welcomenMsg = "Hey!";
 const cantDmMsg = "I can't sent you a DM :/";
+let onlyWhitelist = false;
 
 var state = {
   state: states.LISTEN,
@@ -82,8 +84,14 @@ client.on("ready", () => {
       "DB ready",
     ]);
     logger.info(`[SETUP] ${res.rows[0].message}`); // Hello world!
-    //await pgClient.end()
-    loadPendingEvents();
+
+    if (process.env.WHITELIST_URL) {
+      logger.info(`loading whitelist`);
+      onlyWhitelist = true;
+      loadWhitelist(process.env.WHITELIST_URL, process.env.WHITELIST_GUILD);
+    } else {
+      loadPendingEvents();
+    }
   })();
 });
 
@@ -93,16 +101,20 @@ client.on("message", async (message) => {
   } else if (!message.author.bot) {
     if (message.channel.type === "dm") {
       logger.info(
-        `[ONMSG] ${message.channel.type} - ${message.content} from ${message.author.username}`
+        `[ONMSG] DM ${message.channel.type} - ${message.content} from ${message.author.username}`
       );
-      logger.info(
-        `[ONMSG] state ${state.state} user ${state.user ? state.user.id : "-"}`
-      );
+      handlePrivateMessage(message);
+
       if (state.state === states.SETUP && state.user.id === message.author.id) {
+        logger.info(
+          `[ONMSG] state ${state.state} user ${
+            state.user ? state.user.id : "-"
+          }`
+        );
         handleStepAnswer(message);
       }
     } else {
-      handlePublicMessage(message);
+      !onlyWhitelist && handlePublicMessage(message);
     }
   }
 });
@@ -139,6 +151,22 @@ const handlePublicMessage = async (message) => {
   } else if (eventIsCurrent(event, message.channel.name)) {
     // In-event message. Respond with reaction and DM
     handleEventMessage(message);
+  }
+};
+
+const handlePrivateMessage = async (message) => {
+  logger.info(`[PUBMSG] DM ${message.content} from ${message.author.username}`);
+  const setName = process.env.WHITELIST_GUILD + whitelist;
+
+  const isWhiteListed = await memberExist(setName, message.author.username);
+
+  if (onlyWhitelist && isWhiteListed) {
+    logger.info(`[PUBMSG] WHITELISTED ${message.author.username}`);
+
+    // In-event message. Respond with reaction and DM
+    handlePrivateEventMessage(message);
+  } else {
+    logger.info(`[PUBMSG] NOTWHITELISTED ${message.author.username}`);
   }
 };
 
@@ -305,6 +333,76 @@ const handleStepAnswer = async (message) => {
       break;
     }
   }
+};
+
+const handlePrivateEventMessage = async (message) => {
+  // get event
+  let event = process.env.WHITELIST_GUILD;
+  logger.info(
+    `[EVENTMSG] is ${process.env.PASS_GUILD} in msg: ${message.content}`
+  );
+
+  const exist = await memberExist(event, message.author.username);
+
+  // check return 1 if new check return 0 if already added
+  logger.info(
+    `[EVENTMSG] Check redis: ${exist} | ${message.author.username} ${
+      exist == 0 ? "new username" : "not new"
+    }`
+  );
+  // 1) check if the user already exist
+
+  if (exist == 0) {
+    // 2) pass?
+    if (
+      process.env.PASS_GUILD && (event.pass == "-" ||
+      message.content
+        .toLowerCase()
+        .includes(process.env.PASS_GUILD.toLowerCase()))
+    ) {
+      const check = await addToSet(event, message.author.username);
+      if (check) {
+        logger.info(`[EVENTMSG] sending DM to ${message.author.username}`);
+
+        const code = await popFromSet(event + codeSet);
+        logger.info(`[SENCODE] Code found: ${code}`);
+        // replace placeholder in message
+        const newMsg =  defaultResponseMessage.replace("{code}", code);
+        // Send DM
+        message
+          .reply(newMsg)
+          .catch((error) =>
+            logger.error(
+              `[EVENTMSG] error with DM ${error.httpStatus} - ${error.message}`
+            )
+          );
+        // Add reaction
+        // await message.react(event.reaction)
+        event.user_count++;
+        logPrivateUserAndCode(event, message.author.username, code);
+      } else {
+        logger.info(
+          `[SENDCODE] ${message.author.username} already has a badge`
+        );
+      }
+      // TODO ?? Add to used codes map ??
+    } else {
+      logger.info(`[EVENTMSG] sorry wrong pass: ${message.content}`);
+      // now react !
+      message
+        .react("❌")
+        .catch((error) =>
+          logger.error(
+            `[EVENTMSG] error with reaction ${error.httpStatus} - ${error.message}`
+          )
+        );
+    }
+  } else {
+    logger.info(
+      `[EVENTMSG] we can't continue talking with ${message.author.username}`
+    );
+  }
+  // Check whether already responded (Redis)
 };
 
 const handleEventMessage = async (message) => {
@@ -590,6 +688,33 @@ const getEmoji = (guildName, emojiName) => {
   return false;
 };
 
+const loadWhitelist = async (url, guild) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const res = await axios.get(url);
+      const setName = guild + whitelist;
+      logger.info(`[WHITELIST] setName: ${setName}`);
+      let count = 0;
+      csv
+        .parseString(res.data, { headers: false })
+        .on("data", function (code) {
+          if (code.length) {
+            logger.info(`-> code added: ${code}`);
+            count += 1;
+            addToSet(setName, code);
+          }
+        })
+        .on("end", function () {
+          logger.info(`[WHITELIST] whitelisted  ${count}`);
+          resolve(count);
+        })
+        .on("error", (error) => logger.error(error));
+    } catch (err) {
+      logger.error(`[WHITELIST] Error reading file: ${err}`);
+    }
+  });
+};
+
 const readFile = async (url, guild) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -739,6 +864,26 @@ const logUserAndCode = async (event, username, code) => {
         "(server, channel, username, code, date)" +
         "VALUES ($1, $2, $3, $4, $5)",
       [event.server, event.channel, username, code, date]
+    );
+  } catch (err) {
+    logger.error(`[PG] Error logging code: ${err}`);
+  }
+};
+
+const logPrivateUserAndCode = async (event, username, code) => {
+  try {
+    let date = new Date();
+    let res;
+    await checkAndConnectDB();
+    // ADD LOG
+    logger.info(
+      `[PG] adding log to ${username} to ${event}|DM`
+    );
+    res = await pgClient.query(
+      "INSERT INTO logs " +
+        "(server, channel, username, code, date)" +
+        "VALUES ($1, $2, $3, $4, $5)",
+      [event, 'DM', username, code, date]
     );
   } catch (err) {
     logger.error(`[PG] Error logging code: ${err}`);
