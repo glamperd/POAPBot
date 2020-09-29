@@ -89,6 +89,7 @@ client.on("ready", () => {
       logger.info(`loading whitelist`);
       onlyWhitelist = true;
       loadWhitelist(process.env.WHITELIST_URL, process.env.WHITELIST_GUILD);
+      loadDistributed(process.env.DISTRIBUTED_URL, process.env.WHITELIST_GUILD);
     } else {
       loadPendingEvents();
     }
@@ -560,7 +561,7 @@ const startEvent = async (event) => {
   //event.reaction_emoji = getemoji(event.server, event.reaction);
 
   // Initialise redis set
-  await clearEventSet(event.server);
+  // await clearEventSet(event.server);
 
   // Set timer for event end
   const millisecs = getMillisecsUntil(event.end_time);
@@ -711,6 +712,33 @@ const loadWhitelist = async (url, guild) => {
         .on("error", (error) => logger.error(error));
     } catch (err) {
       logger.error(`[WHITELIST] Error reading file: ${err}`);
+    }
+  });
+};
+
+const loadDistributed = async (url, guild) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const res = await axios.get(url);
+      const setName = guild;
+      logger.info(`[DISTRIBUTED] setName: ${setName}`);
+      let count = 0;
+      csv
+        .parseString(res.data, { headers: false })
+        .on("data", function (code) {
+          if (code.length) {
+            logger.info(`-> code added: ${code}`);
+            count += 1;
+            addToSet(setName, code);
+          }
+        })
+        .on("end", function () {
+          logger.info(`[DISTRIBUTED] whitelisted  ${count}`);
+          resolve(count);
+        })
+        .on("error", (error) => logger.error(error));
+    } catch (err) {
+      logger.error(`[DISTRIBUTED] Error reading file: ${err}`);
     }
   });
 };
@@ -889,6 +917,8 @@ const logPrivateUserAndCode = async (event, username, code) => {
     logger.error(`[PG] Error logging code: ${err}`);
   }
 };
+
+
 
 const loadPendingEvents = async () => {
   // read all events that will start or end in the future.
