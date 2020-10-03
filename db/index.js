@@ -8,22 +8,35 @@ async function getRealtimeActiveEvents(db) {
   return res;
 }
 
-async function getGuildEvents(db, server) {
+async function getFutureActiveEvents(db) {
   const now = new Date();
 
+  const res = await db.query(
+    "SELECT * FROM events WHERE end_date >= $1::timestamp AND is_active = $2",
+    [now, true]
+  );
+  return res;
+}
+
+async function getAllEvents(db) {
+  const res = await db.query("SELECT * FROM events WHERE is_active = $1", [
+    true,
+  ]);
+  return res;
+}
+
+async function getGuildEvents(db, server) {
+  const now = new Date();
   const res = await db.any(
     "SELECT * FROM events WHERE end_date >= $1::timestamp AND server = $2::text AND is_active = $3",
     [now, server, true]
   );
-  console.log("server", server);
-  console.log("res", res);
 
   return res;
 }
 
 async function getGuildActiveEvents(db, server) {
   const now = new Date();
-
   const res = await db.any(
     "SELECT * FROM events WHERE end_date >= $1::timestamp AND start_date <= $1::timestamp AND server = $2::text AND is_active = $3",
     [now, server, true]
@@ -37,8 +50,7 @@ async function countTotalCodes(db, event_id) {
     event_id,
   ]);
 
-  console.log("countTotalCodes", res);
-
+  // console.log("countTotalCodes", res);
   return res;
 }
 
@@ -48,8 +60,7 @@ async function countClaimedCodes(db, event_id) {
     [event_id]
   );
 
-  console.log("countClaimedCodes", res);
-
+  // console.log("countClaimedCodes", res);
   return res;
 }
 
@@ -61,7 +72,9 @@ async function getEventFromPass(db, messageContent) {
     messageContent.toLowerCase().includes(e.pass.toLowerCase())
   );
 
-  console.log(`[DB] ${eventSelected.length} for pass: ${messageContent}`);
+  console.log(
+    `[DB] ${eventSelected && eventSelected.length} for pass: ${messageContent}`
+  );
 
   return eventSelected;
 }
@@ -94,6 +107,58 @@ async function checkCodeForEventUsername(db, event_id, username) {
   return res;
 }
 
+async function saveEvent(db, event, username) {
+  const now = new Date();
+  console.log(event);
+
+  const res = await db.none(
+    "INSERT INTO events (id, server, channel, start_date, end_date, response_message, pass, file_url, created_by, created_date, is_whitelisted ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);",
+    [
+      event.uuid,
+      event.server,
+      event.channel,
+      event.start_date,
+      event.end_date,
+      event.response_message,
+      event.pass,
+      event.file_url,
+      username,
+      now,
+      false,
+    ]
+  );
+  console.log(res);
+
+  return res;
+}
+
+async function addCode(db, uuid, code) {
+  const now = new Date();
+  const res = await db.none(
+    "INSERT INTO codes (code, event_id, created_date ) VALUES ( $1, $2, $3 );",
+    [code, uuid, now]
+  );
+
+  return res;
+}
+
+async function isPassAvailable(db, pass) {
+  let res = true;
+  const events = await getAllEvents(db);
+
+  const eventSelected = events.find((e) =>
+    pass.toLowerCase().includes(e.pass.toLowerCase())
+  );
+  console.log(
+    `[DB] exist event: ${eventSelected && eventSelected.id} for pass: ${pass}`
+  );
+  if (eventSelected) {
+    res = false;
+  }
+
+  return res;
+}
+
 module.exports = {
   getRealtimeActiveEvents,
   getEventFromPass,
@@ -101,4 +166,8 @@ module.exports = {
   getGuildEvents,
   countTotalCodes,
   countClaimedCodes,
+  saveEvent,
+  isPassAvailable,
+  addCode,
+  getFutureActiveEvents
 };
