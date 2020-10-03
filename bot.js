@@ -4,6 +4,7 @@ const csv = require("fast-csv");
 const pino = require("pino");
 const queryHelper = require("./db");
 const pgPromise = require("pg-promise");
+const { v4: uuidv4 } = require("uuid");
 
 const db = pgPromise()({
   host: process.env.DB_HOST || "localhost",
@@ -53,7 +54,6 @@ const defaultPass = "-";
 const defaultReaction = "🏅";
 const welcomenMsg = "Hey!";
 const cantDmMsg = "I can't sent you a DM :/";
-let onlyWhitelist = false;
 
 var state = {
   state: states.LISTEN,
@@ -74,7 +74,7 @@ client.on("ready", () => {
     const res = await db.query("select count(*) from pg_database");
     logger.info(
       `[SETUP] ${res[0].count > 0 ? "PG client ready!" : "PG NOT READY"}`
-    ); // Hello world!
+    ); 
 
     await loadPendingEvents();
   })();
@@ -89,8 +89,6 @@ client.on("message", async (message) => {
         `[MSG] DM ${message.channel.type} - ${message.content} from ${message.author.username}`
       );
 
-      handlePrivateEventMessage(message);
-
       if (state.state === states.SETUP && state.user.id === message.author.id) {
         logger.info(
           `[ONMSG] state ${state.state} user ${
@@ -98,6 +96,8 @@ client.on("message", async (message) => {
           }`
         );
         handleStepAnswer(message);
+      } else {
+        handlePrivateEventMessage(message);
       }
     } else {
       handlePublicMessage(message);
@@ -131,9 +131,14 @@ const handlePublicMessage = async (message) => {
   const bot = client.user;
 
   if (message.mentions.has(bot)) {
+    if (
+      message.content.includes("@everyone") ||
+      message.content.includes("@here")
+    )
+      return "";
     logger.info(`[PUBMSG] ${message.author.username} - Message mentions me`);
     botCommands(message);
-  } 
+  }
 };
 
 const botCommands = async (message) => {
@@ -148,9 +153,14 @@ const botCommands = async (message) => {
     } else if (message.content.includes("!status")) {
       logger.info(`[BOT] status request`);
       // sendDM(message.author, `Current status: ${state.state}`);
-      const events = await queryHelper.getGuildEvents(db, message.channel.guild.name); // Don't auto-create
+      const events = await queryHelper.getGuildEvents(
+        db,
+        message.channel.guild.name
+      ); // Don't auto-create
       if (events && events.length > 0) {
-        events.forEach(async e => sendDM(message.author, `${await formattedEvent(e)}`))
+        events.forEach(async (e) =>
+          sendDM(message.author, `${await formattedEvent(e)}`)
+        );
         reactMessage(message, "🙌");
       }
     } else {
@@ -182,46 +192,25 @@ const handleStepAnswer = async (message) => {
         state.event.channel = answer;
         state.next = steps.START;
         state.dm.send(
-          `Date and time to start? (${state.event.start_time || ""})`
+          `Date and time to start?  (${
+            state.event.start_date || ""
+          }) *Hint: Time in UTC this format 👉  yyyy-mm-dd hh:mm`
         );
       }
       break;
     }
     case steps.START: {
-      if (answer === "-") answer = state.event.start_time;
-      state.event.start_time = answer;
+      if (answer === "-") answer = state.event.start_date;
+      state.event.start_date = answer;
       state.next = steps.END;
       state.dm.send(
-        `Date and time to end the event? (${state.event.end_time || ""})`
+        `Date and time to end the event? (${state.event.end_date || ""})`
       );
       break;
     }
     case steps.END: {
-      if (answer === "-") answer = state.event.end_time;
-      state.event.end_time = answer;
-      state.next = steps.START_MSG;
-      state.dm.send(
-        `Message to publish at the start of the event? (${
-          state.event.start_message || defaultStartMessage
-        })`
-      );
-      break;
-    }
-    case steps.START_MSG: {
-      if (answer === "-")
-        answer = state.event.start_message || defaultStartMessage;
-      state.event.start_message = answer;
-      state.next = steps.END_MSG;
-      state.dm.send(
-        `Message to publish to end the event? (${
-          state.event.end_message || defaultEndMessage
-        })`
-      );
-      break;
-    }
-    case steps.END_MSG: {
-      if (answer === "-") answer = state.event.end_message || defaultEndMessage;
-      state.event.end_message = answer;
+      if (answer === "-") answer = state.event.end_date;
+      state.event.end_date = answer;
       state.next = steps.RESPONSE;
       state.dm.send(
         `Response to send privately to members during the event? (${
@@ -230,37 +219,31 @@ const handleStepAnswer = async (message) => {
       );
       break;
     }
+
     case steps.RESPONSE: {
       if (answer === "-")
         answer = state.event.response_message || defaultResponseMessage;
       state.event.response_message = answer;
-      state.next = steps.REACTION;
-      state.dm.send(
-        `Reaction to public message by channel members during the event? (${
-          state.event.reaction || defaultReaction
-        })`
-      );
-      break;
-    }
-    case steps.REACTION: {
-      if (answer === "-") answer = state.event.reaction || defaultReaction;
-      state.event.reaction = answer;
-      //const emoji = getEmoji(state.event.server, answer);
-      logger.info(`[STEPS] reacting with ${answer}`);
-      await message.react(answer);
       state.next = steps.PASS;
       state.dm.send(
-        `You can add a secret 🔒  pass (like a word, a hash from youtube or a complete link). If you don't need a password just answer with "-"`
+        `Choose secret 🔒  pass (like a word, a hash from youtube or a complete link). This pass is for your users.`
       );
       break;
     }
+
     case steps.PASS: {
-      if (answer === "-") answer = defaultPass;
-      state.event.pass = answer;
-      //const emoji = getEmoji(state.event.server, answer);
-      logger.info(`[STEPS] pass to get the POAP ${answer}`);
-      state.next = steps.FILE;
-      state.dm.send(`Please attach a CSV file containing tokens`);
+      const passAvailable = await queryHelper.isPassAvailable(db, answer);
+      console.log(passAvailable);
+      if (answer.includes(" ") || !passAvailable) {
+        state.dm.send(`Please choose another secret pass without spaces`);
+      } else {
+        state.event.pass = answer;
+        //const emoji = getEmoji(state.event.server, answer);
+        logger.info(`[STEPS] pass to get the POAP ${answer}`);
+
+        state.next = steps.FILE;
+        state.dm.send(`Please attach a CSV file containing tokens`);
+      }
       break;
     }
     case steps.FILE: {
@@ -270,7 +253,7 @@ const handleStepAnswer = async (message) => {
         const ma = message.attachments.first();
         logger.info(`[STEPS] File ${ma.name} ${ma.url} ${ma.id} is attached`);
         state.event.file_url = ma.url;
-        let total_count = await readFile(ma.url, state.event.server);
+        let total_count = await readFile(ma.url, state.event.uuid);
         // Report number of codes added
         state.dm.send(`${total_count} codes added`);
       }
@@ -279,7 +262,11 @@ const handleStepAnswer = async (message) => {
         `Thank you. That's everything. I'll start the event at the appointed time.`
       );
       clearTimeout(state.expiry);
-      await saveEvent(state.event);
+      await queryHelper
+        .saveEvent(db, state.event, message.author.username)
+        .catch((error) => {
+          console.log(error);
+        });
       // Set timer for event start
       startEventTimer(state.event);
       clearSetup();
@@ -295,55 +282,34 @@ const handlePrivateEventMessage = async (message) => {
   // 1) check if pass is correct and return an event
   const event = await queryHelper.getEventFromPass(db, message.content);
 
-  console.log(event.id);
-
   if (event) {
     const getCode = await queryHelper.checkCodeForEventUsername(
       db,
       event.id,
-      message.author.username
+      message.author.id
     );
 
     getCode && logger.info(`[SENCODE] Code found: ${getCode.code}`);
     if (getCode && getCode.code) {
-      logger.info(`[DM] OK for ${message.author.username}`);
+      logger.info(
+        `[DM] OK for ${message.author.username}/${message.author.id}`
+      );
 
       // replace placeholder in message
       const newMsg = defaultResponseMessage.replace("{code}", getCode.code);
-
       // Send DM
-      replyMessage(message,newMsg)
-  
+      replyMessage(message, newMsg);
     } else {
       reactMessage(message, "🤔");
-      logger.info(`[DM] ${message.author.username} already has a badge`);
+      logger.info(
+        `[DM] ${message.author.username}/${message.author.id} already has a badge`
+      );
     }
   } else {
     // no events
     reactMessage(message, "❌");
   }
 };
-
-const replyMessage = async (message, sendMessage) => {
-  message
-  .reply(sendMessage)
-  .catch((error) =>
-    logger.error(
-      `[DM] error with DM ${error.httpStatus} - ${error.message}`
-    )
-  );
-};
-
-const reactMessage = async (message, reaction) => {
-  message
-    .react(reaction)
-    .catch((error) =>
-      logger.error(
-        `[EVENTMSG] error with reaction ${error.httpStatus} - ${error.message}`
-      )
-    );
-};
-
 
 //-------------------------------------------
 // Setup
@@ -361,10 +327,11 @@ const setupState = async (user, guild) => {
   );
   state.dm.send(`To accept the suggested value, respond with "-"`);
   state.dm.send(
-    `First: which channel do you want me to listen to? (${
+    `First: which channel should I speak in public? (${
       state.event.channel || ""
-    })`
+    }) *Hint: only for start and end event`
   );
+  state.event.uuid = uuidv4();
   state.user = user;
   resetExpiry();
 };
@@ -393,21 +360,12 @@ const clearSetup = () => {
 // ---------------------------------------------------------------------
 // Event
 
-const eventIsCurrent = (event, channel) => {
-  if (!event) return false;
-  if (event.channel !== channel) return false;
-  return (
-    getMillisecsUntil(event.start_time) < 0 &&
-    getMillisecsUntil(event.end_time) > 0
-  );
-};
-
 const startEventTimer = (event) => {
   // get seconds until event start
-  const millisecs = getMillisecsUntil(event.start_time);
+  const millisecs = getMillisecsUntil(event.start_date);
   if (millisecs >= 0) {
     logger.info(
-      `[TIMER] Event starting at ${event.start_time}, in ${
+      `[TIMER] Event starting at ${event.start_date}, in ${
         millisecs / 1000
       } secs`
     );
@@ -417,19 +375,12 @@ const startEventTimer = (event) => {
 };
 
 const startEvent = async (event) => {
-  logger.info(`[EVENT] started: ${JSON.stringify(event)}`);
-  event.user_count = 0;
+  logger.info(`[EVENT] started: ${JSON.stringify(event.server)}`);
   // Send the start message to the channel
-  sendMessageToChannel(event.server, event.channel, event.start_message);
-
-  // Set reaction emoji
-  //event.reaction_emoji = getemoji(event.server, event.reaction);
-
-  // Initialise redis set
-  // await clearEventSet(event.server);
+  sendMessageToChannel(event.server, event.channel, defaultStartMessage);
 
   // Set timer for event end
-  const millisecs = getMillisecsUntil(event.end_time);
+  const millisecs = getMillisecsUntil(event.end_date);
   logger.info(`[EVENT] ending in ${millisecs / 1000} secs`);
   state.endEventTimer = setTimeout((ev) => endEvent(ev), millisecs, event);
 };
@@ -442,8 +393,7 @@ const endEvent = async (event) => {
   logger.info(`[EVENT] ended: ${JSON.stringify(event)}`);
   state.state = states.LISTEN;
   // send the event end message
-  sendMessageToChannel(event.server, event.channel, event.end_message);
-  updateEventUserCount(event);
+  sendMessageToChannel(event.server, event.channel, defaultEndMessage);
 };
 
 const formattedEvent = async (event) => {
@@ -460,8 +410,8 @@ const formattedEvent = async (event) => {
     }
   }
 
-  const totalCodes = await queryHelper.countTotalCodes(db, event.id)
-  const claimedCodes = await queryHelper.countClaimedCodes(db, event.id)
+  const totalCodes = await queryHelper.countTotalCodes(db, event.id);
+  const claimedCodes = await queryHelper.countClaimedCodes(db, event.id);
 
   return `Event in guild: ${event.server}
     Channel: ${event.channel}
@@ -482,7 +432,6 @@ const getGuildEvent = (guild, autoCreate = true) => {
     if (!autoCreate) return false;
     guildEvents.set(guild, {
       server: guild,
-      user_count: 0,
     });
   }
   return guildEvents.get(guild);
@@ -528,142 +477,30 @@ const getGuild = (guildName) => {
   return guild;
 };
 
-const getEmoji = (guildName, emojiName) => {
-  // Set reaction emoji
-  const guild = getGuild(guildName);
-  if (guild) {
-    logger.info(`looking for ${emojiName}`);
-    let emoji = guild.emojis.cache.find(
-      (emoji) => emoji.identifier === emojiName
+const replyMessage = async (message, sendMessage) => {
+  message
+    .reply(sendMessage)
+    .catch((error) =>
+      logger.error(`[DM] error with DM ${error.httpStatus} - ${error.message}`)
     );
-    if (!emoji) {
-      emoji = client.emojis.cache.find(
-        (emoji) => emoji.identifier === emojiName
-      );
-    }
-    if (emoji) {
-      logger.info(
-        `[EMOJI] Found emoji ${emoji.toString()} id ${emoji.identifier}`
-      );
-    } else {
-      logger.info(
-        `[EMOJI] ${emojiName} not found. Guild emojis ${JSON.stringify(
-          guild.emojis.cache
-        )} ${JSON.stringify(client.emojis.cache)} `
-      );
-    }
-  }
-  return false;
+};
+
+const reactMessage = async (message, reaction) => {
+  message
+    .react(reaction)
+    .catch((error) =>
+      logger.error(
+        `[EVENTMSG] error with reaction ${error.httpStatus} - ${error.message}`
+      )
+    );
 };
 
 //-------------------------------------------------------------------------------------------------
-// DB functions
-
-const checkAndConnectDB = async () => {
-  if (!dbConnected) await pgClient.connect();
-};
-
-const getEvent = async (guild) => {
-  try {
-    await checkAndConnectDB();
-    const res = await pgClient.query(
-      "SELECT * FROM event WHERE server = $1::text",
-      [guild]
-    );
-    logger.info(`[EVENT] retrieved from DB: ${JSON.stringify(res.rows[0])}`);
-    //await pgClient.end();
-    if (res.rows.length > 0) {
-      return res.rows[0];
-    } else {
-      return {};
-    }
-  } catch (err) {
-    logger.error(`[EVENT] Error while getting event: ${err}`);
-    return {};
-  }
-};
-
-const saveEvent = async (event) => {
-  try {
-    //await pgClient.connect();
-    await checkAndConnectDB();
-    let res;
-    let oldEvent = await getEvent(event.server);
-    if (oldEvent.id) {
-      // UPDATE
-      logger.info(
-        `[PG] Updating... ${oldEvent.id} to ${JSON.stringify(event)}`
-      );
-      res = await pgClient.query(
-        "UPDATE event " +
-          "SET channel=$1, start_time=$2, end_time=$3, start_message=$4, end_message=$5, response_message=$6, reaction=$7, pass=$8, user_count=$9, file_url=$10 " +
-          "WHERE id=$11",
-        [
-          event.channel,
-          event.start_time,
-          event.end_time,
-          event.start_message,
-          event.end_message,
-          event.response_message,
-          event.reaction,
-          event.pass,
-          event.user_count,
-          event.file_url,
-          oldEvent.id,
-        ]
-      );
-    } else {
-      logger.info(`[PG] Inserting... ${uuid} to ${JSON.stringify(event)}`);
-      // INSERT
-      res = await pgClient.query(
-        "INSERT INTO event " +
-          "(id, server, channel, start_time, end_time, start_message, end_message, response_message, reaction, pass, user_count, file_url) " +
-          "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
-        [
-          'uuid',
-          event.server,
-          event.channel,
-          event.start_time,
-          event.end_time,
-          event.start_message,
-          event.end_message,
-          event.response_message,
-          event.reaction,
-          event.pass,
-          0,
-          event.file_url,
-        ]
-      );
-    }
-  } catch (err) {
-    logger.error(`[PG] Error saving event: ${err}`);
-  }
-};
-
-const updateEventUserCount = async (event) => {
-  try {
-    //await pgClient.connect();
-    await checkAndConnectDB();
-    let res;
-    if (event.id) {
-      // UPDATE
-      logger.info(
-        `[PG] Updating user count ... ${event.id} to ${event.user_count}`
-      );
-      res = await pgClient.query(
-        "UPDATE event " + "SET user_count=$1 " + "WHERE id=$2",
-        [event.user_count, event.id]
-      );
-    }
-  } catch (err) {
-    logger.error(`[PG] Error updating event: ${err}`);
-  }
-};
 
 const loadPendingEvents = async () => {
   // read all events that will start or end in the future.
   try {
-    let res = await queryHelper.getRealtimeActiveEvents(db);
+    let res = await queryHelper.getFutureActiveEvents(db);
     // console.log(res)
     res &&
       logger.info(`[PG] Active events: ${JSON.stringify(res && res.length)}`);
@@ -672,9 +509,8 @@ const loadPendingEvents = async () => {
       res.forEach(async (row) => {
         logger.info(
           `Active event: ${row.id} | ${row.start_date} - ${row.end_date}`
-        // startEventTimer(row);
-
         );
+        startEventTimer(row);
       });
     } else {
       logger.info("[PG] No pending events");
@@ -684,10 +520,34 @@ const loadPendingEvents = async () => {
   }
 };
 
-
+const readFile = async (url, uuid) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const res = await axios.get(url);
+      let count = 0;
+      csv
+        .parseString(res.data, { headers: false })
+        .on("data", async function (code) {
+          if (code.length) {
+            await queryHelper.addCode(db, uuid, code[0]);
+            logger.info(`-> code added: ${code}`);
+            count += 1;
+          }
+        })
+        .on("end", function () {
+          logger.info(`[CODES] total codes ${count}`);
+          resolve(count);
+        })
+        .on("error", (error) => logger.error(error));
+    } catch (err) {
+      logger.error(`[CODES] Error reading file: ${err}`);
+    }
+  });
+};
 
 //-------------------------------------------------------------------------------------------
 // THIS  MUST  BE  THIS  WAY
 client.login(
-  process.env.BOT_TOKEN 
+  process.env.BOT_TOKEN ||
+    "NzQ2MzY2MDE5MTU2ODM2MzUz.Xz_RhQ.pZz-a0KoUj2yB8DaiAlBRH2nSOA"
 );
