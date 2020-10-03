@@ -74,7 +74,7 @@ client.on("ready", () => {
     const res = await db.query("select count(*) from pg_database");
     logger.info(
       `[SETUP] ${res[0].count > 0 ? "PG client ready!" : "PG NOT READY"}`
-    ); 
+    );
 
     await loadPendingEvents();
   })();
@@ -547,7 +547,4 @@ const readFile = async (url, uuid) => {
 
 //-------------------------------------------------------------------------------------------
 // THIS  MUST  BE  THIS  WAY
-client.login(
-  process.env.BOT_TOKEN ||
-    "NzQ2MzY2MDE5MTU2ODM2MzUz.Xz_RhQ.pZz-a0KoUj2yB8DaiAlBRH2nSOA"
-);
+client.login(process.env.BOT_TOKEN);
