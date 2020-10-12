@@ -46,7 +46,7 @@ const steps = {
 };
 
 const defaultStartMessage =
-  "The POAP distribution event is now active. Post a message in this channel to earn your POAP token.";
+  "The POAP distribution event is now active. *DM me to get your POAP*";
 const defaultEndMessage = "The POAP distribution event has ended.";
 const defaultResponseMessage =
   "Thanks for participating in the event. Here is a link where you can claim your POAP token: {code} ";
@@ -255,7 +255,7 @@ const handleStepAnswer = async (message) => {
         state.event.file_url = ma.url;
         let total_count = await readFile(ma.url, state.event.uuid);
         // Report number of codes added
-        state.dm.send(`${total_count} codes added`);
+        state.dm.send(`DONE! codes added`);
       }
       state.next = steps.NONE;
       state.dm.send(
