@@ -13,8 +13,8 @@ The bot will generally not attend to non-administrative members outside of an ev
 
 ### Adding the bot to a guild.
 
-A guild administrator should follow this link:
-https://discord.com/api/oauth2/authorize?client_id=740817735105249341&permissions=519232&scope=bot
+A guild administrator should follow this link to add @POAP-bot (v2):
+https://discord.com/api/oauth2/authorize?client_id=764554729476194315&permissions=2112&scope=bot
 
 It will open the discord.com site in a browser page. Once the user signs in (which may happen automatically if credentials have been cached), they can select the guild in which the bot is to operate, and approve the bot's permissions in that guild. 
 
