@@ -325,6 +325,7 @@ const handlePrivateEventMessage = async (message) => {
   // console.log(message);
   logger.info(`[DM] msg: ${message.content}`);
 
+
   // 1) check if pass is correct and return an event
   const event = await queryHelper.getEventFromPass(db, message.content);
 
@@ -342,7 +343,7 @@ const handlePrivateEventMessage = async (message) => {
       );
       console.log(
         "[DEBBUG] ",
-        JSON.stringify(message),
+        JSON.stringify(message.author),
         " CODE: ",
         getCode.code
       );
