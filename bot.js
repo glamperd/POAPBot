@@ -161,7 +161,7 @@ const botCommands = async (message) => {
         reactMessage(message, "🙌");
       }
     } else {
-      // I decided to not answer mentions. 
+      // I decided to not answer mentions.
       // message.reply(`Commands are: !setup, !status`);
     }
   } else {
@@ -196,16 +196,24 @@ const handleStepAnswer = async (message) => {
       break;
     }
     case steps.START: {
+      // TODO vali-date validate date :p
       if (answer === "-") answer = state.event.start_date;
       state.event.start_date = answer;
       state.next = steps.END;
       state.dm.send(
-        `Date and time to end the event? (${ moment(state.event.start_date).add(1, 'h').format('YYYY-MM-DD HH:mm') || ""})`
+        `Date and time to end the event? (${
+          moment(state.event.start_date)
+            .add(1, "h")
+            .format("YYYY-MM-DD HH:mm") || ""
+        })`
       );
       break;
     }
     case steps.END: {
-      if (answer === "-") answer = moment(state.event.start_date).add(1, 'h').format('YYYY-MM-DD HH:mm');
+      if (answer === "-")
+        answer = moment(state.event.start_date)
+          .add(1, "h")
+          .format("YYYY-MM-DD HH:mm");
       state.event.end_date = answer;
       state.next = steps.RESPONSE;
       state.dm.send(
@@ -276,11 +284,11 @@ const handlePrivateEventMessage = async (message) => {
   logger.info(`[DM] msg: ${message.content}`);
 
   const userIsBanned = await isBanned(db, message.author.id);
-  
+
   if (!userIsBanned) {
     // 1) check if pass is correct and return an event
     const event = await queryHelper.getEventFromPass(db, message.content);
-    console.log(event)
+    console.log(event);
     if (event) {
       const getCode = await queryHelper.checkCodeForEventUsername(
         db,
@@ -303,10 +311,11 @@ const handlePrivateEventMessage = async (message) => {
         );
 
         // replace placeholder in message
-        const replyMsg = event && event.response_message ? 
-        event.response_message.replace("{code}", getCode.code)
-        : defaultResponseMessage.replace("{code}", getCode.code)
-        
+        const replyMsg =
+          event && event.response_message
+            ? event.response_message.replace("{code}", getCode.code)
+            : defaultResponseMessage.replace("{code}", getCode.code);
+
         // Send DM
         replyMessage(message, replyMsg);
       } else {
