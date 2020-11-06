@@ -303,11 +303,10 @@ const handlePrivateEventMessage = async (message) => {
         );
 
         // replace placeholder in message
-        console.log(event.response_message)
-
         const replyMsg = event && event.response_message ? 
         event.response_message.replace("{code}", getCode.code)
         : defaultResponseMessage.replace("{code}", getCode.code)
+        
         // Send DM
         replyMessage(message, replyMsg);
       } else {
