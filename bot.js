@@ -13,50 +13,9 @@ const db = pgPromise()({
   database: process.env.DB_DATABASE || "",
 });
 
-const bannedUsers = [
-  453075221612724226,
-  467199474347802634,
-  411345682281267200,
-  467200970540187652,
-  488160478615568384,
-  499091490643902484,
-  747073483909103717,
-  747073501827170385,
-  747073521108385923,
-  747073513910960158,
-  466208848970252296,
-  574209605010325505,
-  759755652246667304,
-  759756251616772126,
-  760469074475352104,
-  760469082465632286,
-  759757358624407553,
-  451912503853580288,
-  429797762389901315,
-  417310827272601601,
-  472267859574390784,
-  531988737383464970,
-  501250853986893824,
-  501216778412621844,
-  579902813111582720,
-  760476514919383061,
-  496892392671150085,
-  760476479066472489,
-  760476456341602344,
-  752614944708624394,
-  464598521459507209,
-  464679388315910145,
-  428770809734103041,
-  414939190174679052,
-  487810867207864320,
-  502071946523967498,
-  502081752873828387,
-  579907903486689301,
-  760476500125679617,
-];
-
-const isBanned = (user) => {
-  return bannedUsers.includes(user);
+const isBanned = async (db, user_id) => {
+  const isBanned = await queryHelper.getBannedUsersById(db, user_id);
+  return isBanned;
 };
 
 const logger = pino({
@@ -325,42 +284,52 @@ const handlePrivateEventMessage = async (message) => {
   // console.log(message);
   logger.info(`[DM] msg: ${message.content}`);
 
+  const userIsBanned = await isBanned(db, message.author.id);
+  
+  if (!userIsBanned) {
+    // 1) check if pass is correct and return an event
+    const event = await queryHelper.getEventFromPass(db, message.content);
 
-  // 1) check if pass is correct and return an event
-  const event = await queryHelper.getEventFromPass(db, message.content);
-
-  if (event && !isBanned(message.author.id)) {
-    const getCode = await queryHelper.checkCodeForEventUsername(
-      db,
-      event.id,
-      message.author.id
-    );
-
-    getCode && logger.info(`[SENCODE] Code found: ${getCode.code}`);
-    if (getCode && getCode.code) {
-      logger.info(
-        `[DM] OK for ${message.author.username}/${message.author.id}`
-      );
-      console.log(
-        "[DEBBUG] ",
-        JSON.stringify(message.author),
-        " CODE: ",
-        getCode.code
+    if (event) {
+      const getCode = await queryHelper.checkCodeForEventUsername(
+        db,
+        event.id,
+        message.author.id
       );
 
-      // replace placeholder in message
-      const newMsg = defaultResponseMessage.replace("{code}", getCode.code);
-      // Send DM
-      replyMessage(message, newMsg);
+      getCode && logger.info(`[DM] Code found: ${getCode.code}`);
+
+      if (getCode && getCode.code) {
+        logger.info(
+          `[DM] OK for ${message.author.username}/${message.author.id}`
+        );
+
+        console.log(
+          "[DEBBUG] DM",
+          JSON.stringify(message.author),
+          " CODE: ",
+          getCode.code
+        );
+
+        // replace placeholder in message
+        const newMsg = defaultResponseMessage.replace("{code}", getCode.code);
+        // Send DM
+        replyMessage(message, newMsg);
+      } else {
+        reactMessage(message, "🤔");
+        logger.info(
+          `[DM] ${message.author.username}/${message.author.id} already has a badge`
+        );
+      }
     } else {
-      reactMessage(message, "🤔");
-      logger.info(
-        `[DM] ${message.author.username}/${message.author.id} already has a badge`
-      );
+      // no events
+      reactMessage(message, "❌");
     }
   } else {
-    // no events
-    reactMessage(message, "❌");
+    // bannedUser, no answer
+    logger.info(
+      `[BANNEDUSER] DM ${message.author.username}/${message.author.id}`
+    );
   }
 };
 

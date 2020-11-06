@@ -45,6 +45,17 @@ async function getGuildActiveEvents(db, server) {
   return res;
 }
 
+async function getBannedUsersById(db, user_id) {
+  console.log("checking, ", user_id);
+  const res = await db.any(
+    "SELECT COUNT(*) FROM banned WHERE user_id LIKE $1::text",
+    user_id
+  );
+  console.log(user_id, res[0].count);
+
+  return res[0].count > 0;
+}
+
 async function countTotalCodes(db, event_id) {
   const res = await db.one("SELECT count(*) FROM codes WHERE event_id = $1", [
     event_id,
@@ -169,5 +180,6 @@ module.exports = {
   saveEvent,
   isPassAvailable,
   addCode,
-  getFutureActiveEvents
+  getFutureActiveEvents,
+  getBannedUsersById,
 };
