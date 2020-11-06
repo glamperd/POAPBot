@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 const axios = require("axios");
 const csv = require("fast-csv");
 const pino = require("pino");
+const moment = require("moment");
 const queryHelper = require("./db");
 const pgPromise = require("pg-promise");
 const { v4: uuidv4 } = require("uuid");
@@ -12,11 +13,6 @@ const db = pgPromise()({
   password: process.env.DB_PASSWORD || "postgres",
   database: process.env.DB_DATABASE || "",
 });
-
-const isBanned = async (db, user_id) => {
-  const isBanned = await queryHelper.getBannedUsersById(db, user_id);
-  return isBanned;
-};
 
 const logger = pino({
   prettyPrint: {
@@ -55,10 +51,6 @@ const defaultStartMessage =
 const defaultEndMessage = "The POAP distribution event has ended.";
 const defaultResponseMessage =
   "Thanks for participating in the event. Here is a link where you can claim your POAP token: {code} ";
-const defaultPass = "-";
-const defaultReaction = "🏅";
-const welcomenMsg = "Hey!";
-const cantDmMsg = "I can't sent you a DM :/";
 
 var state = {
   state: states.LISTEN,
@@ -169,7 +161,8 @@ const botCommands = async (message) => {
         reactMessage(message, "🙌");
       }
     } else {
-      message.reply(`Commands are: !setup, !status`);
+      // I decided to not answer mentions. 
+      // message.reply(`Commands are: !setup, !status`);
     }
   } else {
     logger.info(`[BOT] user lacks permission, or invalid command`);
@@ -197,9 +190,7 @@ const handleStepAnswer = async (message) => {
         state.event.channel = answer;
         state.next = steps.START;
         state.dm.send(
-          `Date and time to start?  (${
-            state.event.start_date || ""
-          }) *Hint: Time in UTC this format 👉  yyyy-mm-dd hh:mm`
+          `Date and time to start? *Hint: Time in UTC this format 👉  yyyy-mm-dd hh:mm`
         );
       }
       break;
@@ -209,12 +200,12 @@ const handleStepAnswer = async (message) => {
       state.event.start_date = answer;
       state.next = steps.END;
       state.dm.send(
-        `Date and time to end the event? (${state.event.end_date || ""})`
+        `Date and time to end the event? (${ moment(state.event.start_date).add(1, 'h').format('YYYY-MM-DD HH:mm') || ""})`
       );
       break;
     }
     case steps.END: {
-      if (answer === "-") answer = state.event.end_date;
+      if (answer === "-") answer = moment(state.event.start_date).add(1, 'h').format('YYYY-MM-DD HH:mm');
       state.event.end_date = answer;
       state.next = steps.RESPONSE;
       state.dm.send(
@@ -273,7 +264,7 @@ const handleStepAnswer = async (message) => {
           console.log(error);
         });
       // Set timer for event start
-      // startEventTimer(state.event);
+      startEventTimer(state.event);
       clearSetup();
       break;
     }
@@ -289,7 +280,7 @@ const handlePrivateEventMessage = async (message) => {
   if (!userIsBanned) {
     // 1) check if pass is correct and return an event
     const event = await queryHelper.getEventFromPass(db, message.content);
-
+    console.log(event)
     if (event) {
       const getCode = await queryHelper.checkCodeForEventUsername(
         db,
@@ -312,9 +303,13 @@ const handlePrivateEventMessage = async (message) => {
         );
 
         // replace placeholder in message
-        const newMsg = defaultResponseMessage.replace("{code}", getCode.code);
+        console.log(event.response_message)
+
+        const replyMsg = event && event.response_message ? 
+        event.response_message.replace("{code}", getCode.code)
+        : defaultResponseMessage.replace("{code}", getCode.code)
         // Send DM
-        replyMessage(message, newMsg);
+        replyMessage(message, replyMsg);
       } else {
         reactMessage(message, "🤔");
         logger.info(
@@ -331,6 +326,11 @@ const handlePrivateEventMessage = async (message) => {
       `[BANNEDUSER] DM ${message.author.username}/${message.author.id}`
     );
   }
+};
+
+const isBanned = async (db, user_id) => {
+  const isBanned = await queryHelper.getBannedUsersById(db, user_id);
+  return isBanned;
 };
 
 //-------------------------------------------
@@ -532,7 +532,7 @@ const loadPendingEvents = async () => {
         logger.info(
           `Active event: ${row.id} | ${row.start_date} - ${row.end_date}`
         );
-        // startEventTimer(row);
+        startEventTimer(row);
       });
     } else {
       logger.info("[PG] No pending events");
