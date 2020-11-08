@@ -7,6 +7,9 @@ During active events, users only need to sent a DM to @POAP-bot
 2. Directly Message @POAP-bot with the 'Secret Code'
 3. Your POAP claim link code will be sent as a reply from the @POAP-bot.
 
+Example:
+ ![POAP-bot example](https://res.cloudinary.com/dbiqkiypz/image/upload/v1604692202/Screen_Shot_2020-11-06_at_16.45.29_ylsa5z.png)
+
 ## Add @POAP-bot to your server.
 
 You can add to you discord server the @POAP-bot with this link:
@@ -19,7 +22,7 @@ The bot will appear as a new member of the server.
 ## Setting up new POAP Event
 Administrators may issue a command to the bot by mentioning it in a text channel, then adding the command in the message. Example:
 
-`@POAP-bot !status`
+`@POAP-bot !setup`
 
 Note that the _mention_ must be to the bot as a _member_ and the bot will respond in a direct message dialog with the requesting user. Depending on the Discord client, the bot's _member_ name may be offered alongside its icon in a selection list when beginning to type the bot's name.
 
