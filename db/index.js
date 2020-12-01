@@ -78,9 +78,10 @@ async function countClaimedCodes(db, event_id) {
 async function getEventFromPass(db, messageContent) {
   const events = await getRealtimeActiveEvents(db);
   // check for similar strings on active events pass
+  let msgSanitized = messageContent.replace('!', '').replace(/ /g, "")
 
   const eventSelected = events.find((e) =>
-    messageContent.toLowerCase().includes(e.pass.toLowerCase())
+    msgSanitized.toLowerCase().includes(e.pass.toLowerCase())
   );
 
   console.log(
