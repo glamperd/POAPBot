@@ -78,10 +78,9 @@ async function countClaimedCodes(db, event_id) {
 async function getEventFromPass(db, messageContent) {
   const events = await getRealtimeActiveEvents(db);
   // check for similar strings on active events pass
-  let msgSanitized = messageContent.replace('!', '').replace(/ /g, "")
 
   const eventSelected = events.find((e) =>
-    msgSanitized.toLowerCase().includes(e.pass.toLowerCase())
+    isMsgTheSame(messageContent, e.pass)
   );
 
   console.log(
@@ -159,7 +158,7 @@ async function isPassAvailable(db, pass) {
   const events = await getAllEvents(db);
 
   const eventSelected = events.find((e) =>
-    pass.toLowerCase().includes(e.pass.toLowerCase())
+    isMsgTheSame(pass, e.pass)
   );
   console.log(
     `[DB] exist event: ${eventSelected && eventSelected.id} for pass: ${pass}`
@@ -169,6 +168,11 @@ async function isPassAvailable(db, pass) {
   }
 
   return res;
+}
+
+const isMsgTheSame = (message, eventPass) => {
+  let messagePass = message.replace('!', '').replace(/ /g, "")
+  return eventPass.toLowerCase().includes(messagePass.toLowerCase())
 }
 
 module.exports = {
