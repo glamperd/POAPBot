@@ -51,6 +51,7 @@ const defaultStartMessage =
 const defaultEndMessage = "The POAP distribution event has ended.";
 const defaultResponseMessage =
   "Thanks for participating in the event. Here is a link where you can claim your POAP token: {code} ";
+const instructions = ":warning: :warning: :warning: :warning: **You MUST send me a DIRECT MESSAGE with the code** :warning: :warning: :warning: :warning:  (click my name)"
 
 var state = {
   state: states.LISTEN,
@@ -160,13 +161,15 @@ const botCommands = async (message) => {
         );
         reactMessage(message, "🙌");
       }
-    } else {
-      // I decided to not answer mentions.
-      // message.reply(`Commands are: !setup, !status`);
+    } else if (message.content.includes("!instructions") || message.content.includes("!instruction")) {
+      logger.info(`[BOT] instructions request`);
+
+      reactMessage(message, "🤙")
+      message.reply(instructions);
     }
   } else {
     logger.info(`[BOT] user lacks permission, or invalid command`);
-    reactMessage(message, "❗");
+    // reactMessage(message, "❗");
   }
 };
 
@@ -181,16 +184,15 @@ const handleStepAnswer = async (message) => {
       // Confirm that channel exists
       const chan = await getChannel(state.event.server, answer);
       if (!chan) {
+        const channels = printChannels(state.event.server)
         state.dm.send(
-          `I can't find a channel named ${answer}. Try again? ${
-            state.event.channel || ""
-          }`
+          `I can't find a channel named ${answer}. Try again -> ${channels}`
         );
       } else {
         state.event.channel = answer;
         state.next = steps.START;
         state.dm.send(
-          `Date and time to start? *Hint: Time in UTC this format 👉  yyyy-mm-dd hh:mm`
+          `Date and time to START 🛫 ? *Hint: Time in UTC this format 👉  yyyy-mm-dd hh:mm`
         );
       }
       break;
@@ -198,15 +200,21 @@ const handleStepAnswer = async (message) => {
     case steps.START: {
       // TODO vali-date validate date :p
       if (answer === "-") answer = state.event.start_date;
-      state.event.start_date = answer;
-      state.next = steps.END;
-      state.dm.send(
-        `Date and time to end the event? (${
-          moment(state.event.start_date)
-            .add(1, "h")
-            .format("YYYY-MM-DD HH:mm") || ""
-        })`
-      );
+      if(!moment(answer).isValid()){
+        state.dm.send(
+          `mmmm ${answer} It's a valid date? Try again 🙏`
+        );
+      } else {
+        state.event.start_date = answer;
+        state.next = steps.END;
+        state.dm.send(
+          `Date and time to END 🛬  the event? (${
+            (moment(state.event.start_date).isValid() && moment(state.event.start_date)
+              .add(1, "h")
+              .format("YYYY-MM-DD HH:mm")) || ""
+          })`
+        );
+      }
       break;
     }
     case steps.END: {
@@ -214,6 +222,7 @@ const handleStepAnswer = async (message) => {
         answer = moment(state.event.start_date)
           .add(1, "h")
           .format("YYYY-MM-DD HH:mm");
+      
       state.event.end_date = answer;
       state.next = steps.RESPONSE;
       state.dm.send(
@@ -238,8 +247,8 @@ const handleStepAnswer = async (message) => {
     case steps.PASS: {
       const passAvailable = await queryHelper.isPassAvailable(db, answer);
       console.log(passAvailable);
-      if (answer.includes(" ") || !passAvailable) {
-        state.dm.send(`Please choose another secret pass without spaces`);
+      if (!passAvailable) {
+        state.dm.send(`Please choose another secret pass. Try again 🙏 `);
       } else {
         state.event.pass = answer;
         //const emoji = getEmoji(state.event.server, answer);
@@ -367,7 +376,8 @@ const setupState = async (user, guild) => {
 };
 
 const resetExpiry = () => {
-  if (state.expiry) {
+  console.log('setting reset')
+  if (state.state != states.LISTEN) {
     clearTimeout(state.expiry);
     state.expiry = setTimeout(() => {
       state.dm.send(
@@ -496,6 +506,15 @@ const getChannel = (guildName, channelName) => {
     return false;
   }
   return channel;
+};
+
+const printChannels = (guildName) => {
+  const guild = getGuild(guildName);
+  if (!guild) {
+    return false;
+  }
+  const channels = guild.channels.cache.map( chan => `${chan},` ).join(' ');
+  return channels;
 };
 
 const getGuild = (guildName) => {
