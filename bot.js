@@ -140,13 +140,14 @@ const handlePublicMessage = async (message) => {
 };
 
 const botCommands = async (message) => {
-  let allowedRole = message.guild.roles.cache.find(x => x.name === 'POAP MASTER')
-  if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD) || (allowedRole && message.member.roles.has(allowedRole.id))) {
+  // let allowedRole = message.guild.roles.cache.find(x => x.name === 'POAP MASTER')
+  const roleAllowed = message.member.roles.cache.some(r=>["POAP MASTER"].includes(r.name))
+  logger.info(`[BOT] checking role ${roleAllowed}`);
+  if (message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_GUILD) || roleAllowed) {
     // Check that user is an admin in this guild
-    //  
+    logger.info(`[BOT] user has permission`);
     if (message.content.toLowerCase().includes("!setup") && state.state !== states.SETUP) {
       // one at a time
-      logger.info(`[BOT] user has permission`);
       // Get any current record for this guild
       // start dialog in PM
       await setupState(message.author, message.channel.guild.name);
