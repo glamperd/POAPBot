@@ -100,7 +100,7 @@ async function checkCodeForEventUsername(db, event_id, username) {
         [event_id, username]
       );
       const code = await t.one(
-        "UPDATE codes SET username = $1, claimed_date = $3::timestamp WHERE code in (SELECT code FROM codes WHERE event_id = $2 AND username IS NULL ORDER BY RANDOM() LIMIT 1) RETURNING code",
+        "UPDATE codes SET username = $1, claimed_date = $3::timestamp WHERE event_id = $2 AND code in (SELECT code FROM codes WHERE event_id = $2 AND username IS NULL ORDER BY RANDOM() LIMIT 1) RETURNING code",
         [username, event_id, now]
       );
       console.log(`[DB] checking event: ${event_id}, user: ${username} `);
