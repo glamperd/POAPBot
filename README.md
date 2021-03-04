@@ -42,3 +42,17 @@ The bot will offer a default value for each parameter.
 ### Example POAP Event
 
 ![POAP-bot example](https://res.cloudinary.com/dbiqkiypz/image/upload/v1604800813/Screen_Shot_2020-11-07_at_23.00.04_z3xulj.png)
+
+## Run locally
+
+1. `npm install`
+2. `npm install -g nodemon`
+3. `sudo -i -u postgres`
+4. `psql`
+5. Run all queries on `db/schema.js` to create the tables
+6. Create a bot [here](https://discord.com/developers/applications/817041487161196594/information) and get the token. You can follow [this tutorial](https://www.howtogeek.com/364225/how-to-make-your-own-discord-bot/)
+7. Copy the bot Token and paste in the end of the `bot.js`, on `process.env.BOT_TOKEN`
+8. `npm run start`
+9. Paste the bot Client ID in this url: `https://discordapp.com/oauth2/authorize?client_id=CLIENTID&scope=bot`
+10. Access the URL and let the bot join your server
+11. Finished! Now have fun using it!
